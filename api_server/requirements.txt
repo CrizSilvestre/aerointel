@@ -1,0 +1,4 @@
+# Solo para la API REST en vivo OPCIONAL (api_server/app.py).
+# El pipeline principal (aerointel.py) y la API estática NO requieren nada de esto.
+fastapi>=0.110
+uvicorn[standard]>=0.29

@@ -1,0 +1,24 @@
+{
+  "_comment": "Allowlist de fuentes (editable). type: gnews = Google News RSS por consulta; rss = feed directo.",
+  "sources": [
+    { "name": "Google News · PUJ/RD (ES)", "type": "gnews", "lang": "es-419", "gl": "DO",
+      "query": "\"Punta Cana\" aeropuerto OR Arajet OR \"República Dominicana\" aviación OR vuelo cancelado OR nueva ruta" },
+    { "name": "Google News · Aviation/Caribbean (EN)", "type": "gnews", "lang": "en-US", "gl": "US",
+      "query": "aviation \"Punta Cana\" OR Caribbean airport OR \"Dominican Republic\" airline OR Airbus OR Boeing" },
+    { "name": "Simple Flying", "type": "rss", "url": "https://simpleflying.com/feed/" },
+    { "name": "AeroTime", "type": "rss", "url": "https://www.aerotime.aero/rss" },
+    { "name": "Aviation Week", "type": "rss", "url": "https://aviationweek.com/rss.xml" },
+    { "name": "Diario Libre (RD)", "type": "rss", "url": "https://www.diariolibre.com/rss/economia.xml" },
+    { "name": "Google News · Seguridad/incidentes (EN)", "type": "gnews", "lang": "en-US", "gl": "US",
+      "query": "aviation incident OR \"emergency landing\" OR \"aircraft\" diverted OR \"runway\" OR \"engine failure\"" },
+    { "name": "Google News · Meteo Caribe (EN)", "type": "gnews", "lang": "en-US", "gl": "US",
+      "query": "hurricane Caribbean OR \"tropical storm\" Caribbean OR \"Dominican Republic\" flights OR Caribbean airport weather disruption" }
+  ],
+  "_fuentes_oficiales_para_sumar": [
+    "NHC Atlántico (ciclones): https://www.nhc.gov/index-at.xml",
+    "aviationweather.gov (SIGMET/TAF API)",
+    "FAA / EASA / NTSB press feeds",
+    "Newsrooms Airbus y Boeing (RSS)",
+    "GDELT (eventos globales + tono)"
+  ]
+}

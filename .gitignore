@@ -1,0 +1,22 @@
+# Salida generada por el pipeline (se regenera en cada corrida / en GitHub Actions)
+output/
+
+# Base de datos SQLite (estado local; se regenera). En el cron de Actions es efímera.
+aerointel.db
+*.db-journal
+
+# Entornos virtuales
+.venv/
+venv/
+
+# Secretos / entorno
+.env
+*.key
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Sistema
+.DS_Store
