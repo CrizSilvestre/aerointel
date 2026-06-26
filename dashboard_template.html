@@ -227,19 +227,25 @@
        aeropuerto/aeronave/ruta). Es una ficha de inteligencia, no una foto genérica. ── */
     .plate {
       position: absolute; inset: 0; z-index: 1;
-      display: flex; flex-direction: column; justify-content: center; align-items: center;
-      gap: 10px; padding: 16px; text-align: center; color: rgba(255, 255, 255, .96);
+      display: flex; flex-direction: column; justify-content: space-between; align-items: center;
+      gap: 8px; padding: 12px 14px 16px; text-align: center; color: rgba(255, 255, 255, .96);
+    }
+    /* fila superior: badges de severidad + categoría (en flujo → nunca pisan el titular) */
+    .plate .ptop {
+      display: flex; align-items: center; justify-content: center; gap: 7px; flex-wrap: wrap;
+      width: 100%;
     }
     .plate .pcat {
       font-size: 11px; letter-spacing: 3px; text-transform: uppercase; font-weight: 800;
       opacity: .85;
     }
     .plate .plabel {
-      font-family: var(--serif); font-weight: 700; font-size: 30px; line-height: 1.05;
-      letter-spacing: .3px;
+      font-family: var(--serif); font-weight: 700; font-size: 25px; line-height: 1.08;
+      letter-spacing: .3px; margin: auto 0; max-width: 100%;
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
     }
     .plate .pents {
-      display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-width: 92%;
+      display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-width: 96%;
     }
     .plate .pents span {
       font-family: ui-monospace, Menlo, monospace; font-size: 12px; font-weight: 700;
@@ -248,11 +254,15 @@
     }
     .plate .pmark {
       position: absolute; right: 13px; bottom: 11px; font-size: 9.5px; font-weight: 800;
-      letter-spacing: 2px; opacity: .5;
+      letter-spacing: 2px; opacity: .45;
     }
-    .plate.sm .plabel { font-size: 17px; }
+    .plate.sm .plabel { font-size: 16px; -webkit-line-clamp: 3; }
     .plate.sm .pcat { font-size: 9.5px; letter-spacing: 2px; }
-    .plate.sm { gap: 7px; padding: 11px; }
+    .plate.sm { gap: 6px; padding: 10px 11px 13px; }
+    .plate.sm .pents span { font-size: 10.5px; padding: 1px 6px; }
+
+    /* overlay de badges SOLO sobre fotos reales (esquina superior izquierda) */
+    .ovbadge { position: absolute; top: 8px; left: 8px; z-index: 4; display: flex; gap: 5px; }
 
     /* chips de entidades bajo el titular (también sobre fotos reales) */
     .chips {
@@ -704,19 +714,19 @@
       const n = new Date(), hh = String(n.getHours()).padStart(2, '0'), mm = String(n.getMinutes()).padStart(2, '0');
       const fecha = `${n.getDate()} ${_MESES[n.getMonth()].slice(0, 3)} ${n.getFullYear()}, ${hh}:${mm}`;
       const brk = EVENTS.filter(e => e.sev === 'crítico').length, puj = EVENTS.filter(e => e.puj).length;
-      const ico = s => s === 'crítico' ? '🔴' : s === 'importante' ? '🟠' : '🔵';
+      const tag = s => s === 'crítico' ? 'ÚLTIMA HORA' : s === 'importante' ? 'ACTUALIZACIÓN' : 'INFO';
       const L = [];
-      L.push(`✈️ **AeroIntel — Resumen aeronáutico** · ${fecha}`);
-      L.push(`📍 Hub PUJ · ${EVENTS.length} historias · 🔴 ${brk} última hora · ⭐ ${puj} relacionadas con PUJ`);
+      L.push('**AeroIntel — Resumen aeronáutico**');
+      L.push(`${fecha}  ·  Hub PUJ  ·  ${EVENTS.length} historias  ·  ${brk} última hora  ·  ${puj} relacionadas con PUJ`);
       L.push('');
-      EVENTS.slice(0, 7).forEach(e => {
+      EVENTS.slice(0, 7).forEach((e, i) => {
         let why = String(e.why || '').replace(/\s+/g, ' ').trim();
-        if (why.length > 150) why = why.slice(0, 150) + '…';
-        L.push(`${ico(e.sev)} **[${catOf(e.cat).label}]** ${e.title}${e.puj ? ' · _PUJ_' : ''}`);
+        if (why.length > 165) why = why.slice(0, 165) + '…';
+        L.push(`**${i + 1}. [${catOf(e.cat).label} · ${tag(e.sev)}${e.puj ? ' · PUJ' : ''}]** ${e.title}`);
         if (why) L.push(`> ${why}`);
+        L.push('');
       });
-      L.push('');
-      L.push('_Generado por AeroIntel · vigilancia aeronáutica 24/7_');
+      L.push('— Generado por AeroIntel · vigilancia aeronáutica 24/7');
       return L.join('\n');
     }
     function fallbackCopy(text) {
@@ -762,8 +772,8 @@
       const ents = (e.ent && e.ent.length)
         ? `<div class="pents">${e.ent.map(c => `<span>${esc(c)}</span>`).join('')}</div>` : '';
       return `<div class="plate ${sm ? 'sm' : ''}">
-        <div class="pcat">${catOf(e.cat).label}</div>
-        <div class="plabel">${esc(e.title).slice(0, sm ? 60 : 90)}</div>
+        <div class="ptop">${badges(e)}<span class="pcat">${catOf(e.cat).label}</span></div>
+        <div class="plabel">${esc(e.title).slice(0, sm ? 90 : 130)}</div>
         ${ents}<div class="pmark">AEROINTEL</div></div>`;
     }
     // Chips de entidades bajo el titular (aerolínea/aeropuerto/aeronave/ruta).
@@ -778,8 +788,7 @@
         : '';
       return `<div class="hero">
       <a class="cover" style="${grad(e.cat)}" href="${esc(e.link)}" target="_blank" rel="noopener">
-        ${imgMarkup}${hasImg ? '' : plate(e, false)}
-        <span style="display:flex;gap:6px;position:relative;z-index:3;">${badges(e)}</span>
+        ${imgMarkup}${hasImg ? `<div class="ovbadge">${badges(e)}</div>` : plate(e, false)}
       </a>
       <div class="row" style="margin-top:11px;display:flex;gap:9px;align-items:center;font-size:11.5px;color:var(--muted)">
         <span class="cat" style="font-weight:800;color:var(--navy);text-transform:uppercase;letter-spacing:.4px">${catOf(e.cat).label}</span>
@@ -805,8 +814,7 @@
         : '';
       return `<article class="card ${e.sev}">
       <a class="thumb" style="${grad(e.cat)}" href="${esc(e.link)}" target="_blank" rel="noopener">
-        ${imgMarkup}${hasImg ? '' : plate(e, true)}
-        <div class="ov" style="position:relative;z-index:3;">${badges(e)}</div>
+        ${imgMarkup}${hasImg ? `<div class="ovbadge">${badges(e)}</div>` : plate(e, true)}
       </a>
       <div class="row"><span class="cat">${catOf(e.cat).label}</span><span>· ${esc(e.fecha)}</span><span class="impactchip">${e.impact}</span></div>
       <h3><a href="${esc(e.link)}" target="_blank" rel="noopener">${esc(e.title)}</a></h3>
