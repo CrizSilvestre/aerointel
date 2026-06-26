@@ -110,6 +110,25 @@
       color: var(--accent);
     }
 
+    /* identidad del proceso operativo (no intrusiva) */
+    .masthead .owner {
+      margin-top: 7px;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      color: var(--navy);
+      background: #eef1f7;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 4px 12px;
+    }
+    .masthead .owner b { color: var(--navy); font-weight: 800; letter-spacing: .2px; }
+    .owner-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--accent); flex-shrink: 0;
+    }
+
     /* ── Nav ── */
     nav.sections {
       display: flex;
@@ -199,6 +218,8 @@
 
     .wrap {
       padding: 22px;
+      /* altura mínima estable: evita que el footer "salte" al cambiar a una sección con pocas notas */
+      min-height: 78vh;
     }
 
     /* ── Hero ── */
@@ -231,11 +252,12 @@
     }
     /* textura de fondo: rutas de vuelo punteadas (no es una foto, es identidad de marca) */
     .plate .pbg { position: absolute; inset: 0; z-index: 0; opacity: .15; }
-    /* fila superior: badges (izq) + marca (der) */
+    /* fila superior: grupo de badges (izq) + marca (der) — agrupados para que el PUJ no flote */
     .plate .ptop {
-      position: relative; z-index: 2; display: flex; align-items: flex-start;
+      position: relative; z-index: 2; display: flex; align-items: center;
       justify-content: space-between; gap: 8px; padding: 11px 12px 0;
     }
+    .plate .bgrp { display: flex; align-items: center; gap: 6px; }
     .plate .pmark {
       font-size: 9px; font-weight: 800; letter-spacing: 2px; opacity: .5; white-space: nowrap;
       padding-top: 2px;
@@ -268,7 +290,7 @@
     .plate.sm .pents span { font-size: 10.5px; padding: 1px 6px; }
 
     /* overlay de badges SOLO sobre fotos reales (esquina superior izquierda) */
-    .ovbadge { position: absolute; top: 8px; left: 8px; z-index: 4; display: flex; gap: 5px; }
+    .ovbadge { position: absolute; top: 8px; left: 8px; z-index: 4; display: flex; align-items: center; gap: 6px; }
 
     /* chips de entidades bajo el titular (también sobre fotos reales) */
     .chips {
@@ -344,14 +366,22 @@
       font-weight: 700;
     }
 
-    /* ── badges/severidad ── */
+    /* ── badges/severidad: misma altura y alineación vertical en TODOS los componentes ── */
+    .sev, .pujtag {
+      display: inline-flex;
+      align-items: center;
+      line-height: 1;
+      font-weight: 800;
+      border-radius: 3px;
+      height: 18px;
+      box-sizing: border-box;
+    }
+
     .sev {
       font-size: 10.5px;
-      font-weight: 800;
       text-transform: uppercase;
       letter-spacing: .6px;
-      padding: 2px 7px;
-      border-radius: 3px;
+      padding: 0 7px;
       color: #fff;
     }
 
@@ -369,11 +399,9 @@
 
     .pujtag {
       font-size: 9.5px;
-      font-weight: 800;
       background: #ffd54a;
       color: #5a4500;
-      border-radius: 3px;
-      padding: 1px 6px;
+      padding: 0 6px;
       letter-spacing: .4px;
     }
 
@@ -528,27 +556,40 @@
 
     footer {
       border-top: 1px solid var(--line);
-      padding: 16px 22px;
+      padding: 18px 22px;
       color: var(--muted);
       font-size: 11.5px;
       text-align: center;
     }
+    footer .foot-own {
+      color: var(--navy); font-size: 12.5px; margin-bottom: 4px;
+    }
+    footer .foot-own b { font-weight: 800; }
+    footer .foot-meta { font-size: 11px; }
 
-    /* ── Strip de clima (Punta Cana, en vivo) ── */
+    /* ── Strip de clima (widget de condiciones del aeropuerto, en vivo) ── */
     .wx {
       display: flex;
       align-items: center;
-      gap: 9px;
+      gap: 11px;
       font-size: 13px;
       color: var(--ink);
       flex-wrap: wrap;
     }
-    .wx-date { font-weight: 500; }
+    .wx-date { font-weight: 600; color: var(--ink); }
     .wx-sep { color: var(--line); }
-    .wx-temp { color: var(--muted); }
-    .wx-temp b { color: var(--ink); font-weight: 800; font-size: 14px; }
+    .wx-pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: #f0f4fa; border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px 3px 4px;
+    }
+    .wx-loc {
+      font-size: 10px; font-weight: 800; letter-spacing: .6px; color: #fff;
+      background: var(--navy); border-radius: 999px; padding: 3px 8px;
+    }
     .wx-ico { font-size: 16px; line-height: 1; }
-    .wx-cond { color: var(--muted); }
+    .wx-temp { color: var(--muted); font-size: 12px; display: inline-flex; align-items: baseline; gap: 4px; }
+    .wx-temp b { color: var(--ink); font-weight: 800; font-size: 15px; }
+    .wx-cond { color: var(--ink); font-weight: 600; }
 
     /* ── Indicador EN VIVO (estado de la automatización) ── */
     .live { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); font-weight: 600; white-space: nowrap; }
@@ -677,9 +718,12 @@
       <div class="wx">
         <span class="wx-date" id="today"></span>
         <span class="wx-sep">│</span>
-        <span class="wx-temp" id="wx-temp">—</span>
-        <span class="wx-ico" id="wx-ico">✈️</span>
-        <span class="wx-cond" id="wx-cond">Punta Cana</span>
+        <span class="wx-pill" title="Condiciones actuales en el Aeropuerto Internacional de Punta Cana">
+          <span class="wx-loc">PUJ</span>
+          <span class="wx-ico" id="wx-ico">✈️</span>
+          <span class="wx-temp" id="wx-temp">—</span>
+          <span class="wx-cond" id="wx-cond">Punta Cana</span>
+        </span>
       </div>
       <span class="right">
         <span class="live" id="live" title="Estado de la actualización automática"><span class="livedot"></span> EN VIVO · <span id="liveupd">…</span></span>
@@ -694,6 +738,7 @@
       <h1>Aviation Intelligence <span class="pl">Daily</span></h1>
       <div class="sub">Operaciones · Aerolíneas · Seguridad · Clima · Industria — vigilancia 24/7 del mundo aeronáutico
       </div>
+      <div class="owner"><span class="owner-dot"></span>Una herramienta de <b>Gestión Operaciones Airside</b> · Aeropuerto Internacional de Punta Cana (PUJ)</div>
     </div>
     <nav class="sections" id="nav"></nav>
     <div class="ticker"><span class="lab">Última hora</span>
@@ -712,8 +757,10 @@
 
     <div class="wrap" id="main"></div>
 
-    <footer>Actualizado: __UPDATED__ · actualización automática · análisis asistido por IA — fuentes
-      citadas en cada nota</footer>
+    <footer>
+      <div class="foot-own"><b>Gestión Operaciones Airside</b> · Aeropuerto Internacional de Punta Cana (PUJ)</div>
+      <div class="foot-meta">AeroIntel — inteligencia aeronáutica · Actualizado __UPDATED__ · actualización automática · análisis asistido por IA · fuentes citadas en cada nota</div>
+    </footer>
   </div>
   <div class="toast" id="toast"></div>
 
@@ -766,22 +813,30 @@
     const _MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
     (function () { const n = new Date(); document.getElementById('today').textContent = `${n.getDate()} de ${_MESES[n.getMonth()]} del ${n.getFullYear()}`; })();
 
-    // ── Clima de Punta Cana en vivo (Open-Meteo, sin API key). Fallback silencioso si falla. ──
+    // ── Clima del aeropuerto PUJ en vivo (Open-Meteo, sin API key). Ícono y condición salen del
+    //    MISMO código WMO → siempre coinciden. El ícono respeta día/noche para cielo despejado. ──
     (function () {
+      // code → [condición, ícono-día, ícono-noche]
       const WMO = {
-        0: ['Despejado', '☀️'], 1: ['Mayormente despejado', '🌤️'], 2: ['Parcialmente nublado', '⛅'], 3: ['Nubes', '☁️'],
-        45: ['Niebla', '🌫️'], 48: ['Niebla', '🌫️'], 51: ['Llovizna', '🌦️'], 53: ['Llovizna', '🌦️'], 55: ['Llovizna', '🌦️'],
-        56: ['Llovizna', '🌧️'], 57: ['Llovizna', '🌧️'], 61: ['Lluvia', '🌧️'], 63: ['Lluvia', '🌧️'], 65: ['Lluvia fuerte', '🌧️'],
-        66: ['Lluvia', '🌧️'], 67: ['Lluvia', '🌧️'], 71: ['Nieve', '❄️'], 73: ['Nieve', '❄️'], 75: ['Nieve', '❄️'], 77: ['Nieve', '❄️'],
-        80: ['Chubascos', '🌦️'], 81: ['Chubascos', '🌧️'], 82: ['Aguaceros', '⛈️'], 95: ['Tormenta', '⛈️'], 96: ['Tormenta', '⛈️'], 99: ['Tormenta', '⛈️']
+        0: ['Despejado', '☀️', '🌙'], 1: ['Mayormente despejado', '🌤️', '🌙'], 2: ['Parcialmente nublado', '⛅', '☁️'],
+        3: ['Nublado', '☁️', '☁️'], 45: ['Niebla', '🌫️', '🌫️'], 48: ['Niebla', '🌫️', '🌫️'],
+        51: ['Llovizna', '🌦️', '🌧️'], 53: ['Llovizna', '🌦️', '🌧️'], 55: ['Llovizna', '🌧️', '🌧️'],
+        56: ['Llovizna helada', '🌧️', '🌧️'], 57: ['Llovizna helada', '🌧️', '🌧️'],
+        61: ['Lluvia', '🌧️', '🌧️'], 63: ['Lluvia', '🌧️', '🌧️'], 65: ['Lluvia fuerte', '🌧️', '🌧️'],
+        66: ['Lluvia', '🌧️', '🌧️'], 67: ['Lluvia', '🌧️', '🌧️'],
+        71: ['Nieve', '❄️', '❄️'], 73: ['Nieve', '❄️', '❄️'], 75: ['Nieve', '❄️', '❄️'], 77: ['Nieve', '❄️', '❄️'],
+        80: ['Chubascos', '🌦️', '🌧️'], 81: ['Chubascos', '🌧️', '🌧️'], 82: ['Aguaceros', '⛈️', '⛈️'],
+        85: ['Chubascos de nieve', '🌨️', '🌨️'], 86: ['Chubascos de nieve', '🌨️', '🌨️'],
+        95: ['Tormenta', '⛈️', '⛈️'], 96: ['Tormenta con granizo', '⛈️', '⛈️'], 99: ['Tormenta con granizo', '⛈️', '⛈️']
       };
-      fetch('https://api.open-meteo.com/v1/forecast?latitude=18.567&longitude=-68.363&current=temperature_2m,weather_code&timezone=America/Santo_Domingo')
+      fetch('https://api.open-meteo.com/v1/forecast?latitude=18.567&longitude=-68.363&current=temperature_2m,weather_code,is_day&timezone=America/Santo_Domingo')
         .then(r => r.json()).then(d => {
-          const c = Math.round(d.current.temperature_2m), f = Math.round(c * 9 / 5 + 32);
-          const [cond, ico] = WMO[d.current.weather_code] || ['Punta Cana', '✈️'];
+          const cur = d.current, c = Math.round(cur.temperature_2m), f = Math.round(c * 9 / 5 + 32);
+          const w = WMO[cur.weather_code] || ['Nublado', '☁️', '☁️'];
+          const ico = (cur.is_day === 0 && w[2]) ? w[2] : w[1];
           document.getElementById('wx-temp').innerHTML = `<b>${c}°C</b> ${f}°F`;
           document.getElementById('wx-ico').textContent = ico;
-          document.getElementById('wx-cond').textContent = cond;
+          document.getElementById('wx-cond').textContent = w[0];
         }).catch(() => { });
     })();
 
@@ -863,7 +918,7 @@
     const nav = document.getElementById('nav');
     NAV.forEach(([k, l]) => {
       const b = document.createElement('button'); b.textContent = l; b.dataset.k = k;
-      b.onclick = () => { view = k; render(); }; nav.appendChild(b);
+      b.onclick = () => { view = k; render(); window.scrollTo(0, 0); }; nav.appendChild(b);
     });
 
     const sevName = s => s === 'crítico' ? 'Última hora' : s === 'importante' ? 'Actualización' : 'Info';
@@ -875,7 +930,7 @@
       seguridad: '<path d="M24 5l15 5v12c0 10-8 16-15 18-7-2-15-8-15-18V10z"/><path d="M17 24l5 5 9-11"/>',
       meteo: '<path d="M16 33h18a7 7 0 001-14 9 9 0 00-17-2 7 7 0 00-2 16z"/><path d="M23 31l-4 8h5l-3 7"/>',
       rutas: '<path d="M10 35q14-30 28 0" stroke-dasharray="3 4"/><circle cx="10" cy="35" r="3"/><circle cx="38" cy="35" r="3"/><path d="M24 13l3 6-3-1.5L21 19z"/>',
-      industria: '<path d="M8 40V27a16 11 0 0132 0v13z"/><path d="M16 40v-9M24 40v-11M32 40v-9"/>',
+      industria: '<path d="M24 6c1.6 0 2.6 2.6 2.6 5.6V17l14 8.5v3.4l-14-4v9l4.2 3.2v3l-7-2-7 2v-3l4.2-3.2v-9l-14 4v-3.4L21.4 17v-5.4C21.4 8.6 22.4 6 24 6z"/>',
       regulatorio: '<path d="M15 6h13l6 6v30H15z"/><path d="M28 6v6h6"/><path d="M19 23h11M19 29h11M19 35h7"/>',
       tecnologia: '<rect x="16" y="16" width="16" height="16" rx="2"/><path d="M21 16v-6M27 16v-6M21 38v-6M27 38v-6M16 21h-6M16 27h-6M38 21h6M38 27h6"/>',
     };
@@ -888,7 +943,7 @@
         ? `<div class="pents">${e.ent.map(c => `<span>${esc(c)}</span>`).join('')}</div>` : '';
       return `<div class="plate ${sm ? 'sm' : ''}">
         ${PBG}
-        <div class="ptop">${badges(e)}<span class="pmark">AEROINTEL</span></div>
+        <div class="ptop"><span class="bgrp">${badges(e)}</span><span class="pmark">AEROINTEL</span></div>
         <div class="pmid">
           <svg class="picon" viewBox="0 0 48 48">${piconOf(e.cat)}</svg>
           <div class="pname">${catOf(e.cat).label}</div>${ents}

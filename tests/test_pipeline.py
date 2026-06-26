@@ -47,6 +47,14 @@ ok("severidad · crash = crítico", sa["severidad"] == "crítico")
 ok("categoria · accidente = seguridad", sa["categoria"] == "seguridad")
 ru = A.analyze_heuristic("Delta launches new nonstop service to Santo Domingo", 1)
 ok("categoria · nueva ruta = rutas", ru["categoria"] == "rutas")
+# Regresión: 'saf' NO debe matchear dentro de 'USAF'/'safety' (límite de palabra)
+ok("categoria · 'saf' en 'USAF' NO es tecnología", A.analyze_heuristic("USAF deploys B-2 bombers for exercise", 1)["categoria"] != "tecnologia")
+ok("categoria · SAF real sí es tecnología", A.analyze_heuristic("Airline expands sustainable aviation fuel SAF use", 1)["categoria"] == "tecnologia")
+ok("categoria · near-miss = seguridad", A.analyze_heuristic("Delta Air Lines flight avoids close call near Boston", 1)["categoria"] == "seguridad")
+# Regresión: aerolíneas ambiguas no deben confundir nombres propios
+ok("airlines · 'United States' NO es United", A.detect_airlines("United States and Canada sign aviation deal") == [])
+ok("airlines · 'Mississippi Delta' NO es Delta", A.detect_airlines("Flooding hits the Mississippi Delta") == [])
+ok("airlines · 'Delta Air Lines' SÍ", "Delta" in A.detect_airlines("Delta Air Lines flight diverted"))
 
 # ── Extracción de imagen (regex, sin red) ──
 ok("img · og:image directo", bool(A._OG_RE.search('<meta property="og:image" content="https://x.com/a.jpg">')))

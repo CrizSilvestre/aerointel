@@ -239,16 +239,34 @@ KW = {
                     "frequency", "nonstop", "nueva frecuencia", "inaugura", "conecta", "begins flights", "resumes service"],
     "meteo":       ["hurricane", "tropical storm", "tropical depression", "fog", "turbulence", "blizzard",
                     "tormenta tropical", "huracán", "ciclón", "depresión tropical", "onamet", "nhc"],
-    "seguridad":   ["crash", "accident", "incident", "emergency", "mayday", "evacuat", "fire", "smoke", "aog", "accidente", "incidente", "emergencia"],
+    "seguridad":   ["crash", "accident", "incident", "emergency", "mayday", "evacuat", "fire", "smoke", "aog",
+                    "close call", "near miss", "near-miss", "go-around", "go around", "loss of separation",
+                    "tcas", "bird strike", "hard landing", "tail strike", "runway excursion", "rejected takeoff",
+                    "accidente", "incidente", "emergencia", "cuasi accidente"],
     "operaciones": ["delay", "cancel", "strike", "ground stop", "divert", "notam", "retraso", "cancela", "huelga", "desvi", "paro"],
     "regulatorio": ["faa", "easa", "ntsb", "icao", "iata", "idac", "regulat", "directive", "certif", "ban", "suspend", "regul"],
     "industria":   ["order", "delivery", "airbus", "boeing", "embraer", "merger", "earnings", "financ", "pedido", "entrega", "fusión"],
-    "tecnologia":  ["evtol", "saf", "sustainab", "electric", "hydrogen", "drone", "tecnolog", "sostenib"],
+    "tecnologia":  ["evtol", "saf", "sustainable aviation fuel", "sustainab", "electric aircraft", "hydrogen",
+                    "drone", "uav", "tecnolog", "sostenib", "biocombustible"],
 }
 AVIATION = ["aviation", "airline", "airport", "flight", "aircraft", "aerol", "aeropuerto", "vuelo", "avión", "aviaci", "airbus", "boeing", "jet", "carrier"]
 CRIT = ["crash", "accident", "emergency", "mayday", "evacuat", "hurricane", "ground stop", "huracán", "accidente", "emergencia"]
 IMPORT = ["incident", "delay", "cancel", "strike", "storm", "tropical", "aog", "suspend", "incidente", "retraso", "cancela", "tormenta", "huelga"]
 PUJ = ["punta cana", "puj", "dominican", "república dominicana", "republica dominicana", "caribbean", "caribe"]
+
+def _kw_pat(k):
+    """Patrón con LÍMITE DE PALABRA. Acrónimos/cortos (≤4) → palabra exacta (evita 'saf' en
+    'USAF'/'safety', 'ban' en 'Cuban'). Términos largos → prefijo (permite plural/flexión)."""
+    esc = re.escape(k)
+    return r"\b" + esc + (r"\b" if len(k) <= 4 else "")
+
+def word_re(words):
+    return re.compile("|".join(_kw_pat(w) for w in words), re.I)
+
+# Clasificación por categoría y severidad con límite de palabra (no subcadena).
+KW_RE = {cat: word_re(kws) for cat, kws in KW.items()}
+CRIT_RE = word_re(CRIT)
+IMPORT_RE = word_re(IMPORT)
 
 WHY = {
     "meteo":       "Condiciones meteorológicas con posible impacto en operaciones de PUJ y el Caribe; monitorear itinerarios y posibles ajustes (OVER/cancelaciones).",
@@ -268,12 +286,24 @@ AIRLINE_NAMES = sorted(
     key=len, reverse=True)
 AIRLINE_RE = re.compile(r"\b(" + "|".join(re.escape(a) for a in AIRLINE_NAMES) + r")\b", re.I) if AIRLINE_NAMES else None
 
+# Nombres de aerolínea que son palabras comunes → solo cuentan si van seguidos de un calificador
+# de aviación. Evita "United States"→United, "Spirit of"→Spirit, "Mississippi Delta"→Delta, etc.
+_AMBIG_AIRLINES = {"united", "delta", "spirit", "frontier", "american", "breeze", "avelo", "allegiant",
+                   "discover", "sun country", "copa", "wingo", "flair", "condor", "neos", "wamos",
+                   "plus ultra", "sky high", "freedom ii", "world atlantic", "air century", "eastern express"}
+_AIR_QUAL = re.compile(r"^[\s,’'\-–]*(air\b|airline|airways|flight|jet|aircraft|plane|express|"
+                       r"a3\d\d|a2\d\d|b7\d\d|7[2-8]7|cancel|delay|divert|route|fleet|nonstop|crew)", re.I)
+
 def detect_airlines(text):
     if not AIRLINE_RE:
         return []
+    text = text or ""
     seen, out = set(), []
-    for m in AIRLINE_RE.finditer(text or ""):
+    for m in AIRLINE_RE.finditer(text):
         k = m.group(0).lower()
+        # Nombre ambiguo: exige un calificador de aviación inmediatamente después.
+        if k in _AMBIG_AIRLINES and not _AIR_QUAL.match(text[m.end():m.end() + 28]):
+            continue
         if k not in seen:
             seen.add(k); out.append(m.group(0))
     return out[:6]
@@ -566,8 +596,8 @@ def score_event(text, n_sources, cat, sev, airlines, tier, ctx):
 
 def analyze_heuristic(text, n_sources, dt=None):
     tl = text.lower()
-    cat = next((c for c, kws in KW.items() if any(k in tl for k in kws)), "industria")
-    sev = "crítico" if any(k in tl for k in CRIT) else "importante" if any(k in tl for k in IMPORT) else "info"
+    cat = next((c for c, rx in KW_RE.items() if rx.search(text)), "industria")
+    sev = "crítico" if CRIT_RE.search(text) else "importante" if IMPORT_RE.search(text) else "info"
     airlines = detect_airlines(text)
     tier = dr_tier(text)
     puj = tier == "core" or bool(airlines)
