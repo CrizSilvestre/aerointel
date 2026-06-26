@@ -226,39 +226,45 @@
        Muestra la categoría + las entidades aeronáuticas concretas de la nota (aerolínea/
        aeropuerto/aeronave/ruta). Es una ficha de inteligencia, no una foto genérica. ── */
     .plate {
-      position: absolute; inset: 0; z-index: 1;
-      display: flex; flex-direction: column; justify-content: space-between; align-items: center;
-      gap: 8px; padding: 12px 14px 16px; text-align: center; color: rgba(255, 255, 255, .96);
+      position: absolute; inset: 0; z-index: 1; overflow: hidden; color: #fff;
+      display: flex; flex-direction: column;
     }
-    /* fila superior: badges de severidad + categoría (en flujo → nunca pisan el titular) */
+    /* textura de fondo: rutas de vuelo punteadas (no es una foto, es identidad de marca) */
+    .plate .pbg { position: absolute; inset: 0; z-index: 0; opacity: .15; }
+    /* fila superior: badges (izq) + marca (der) */
     .plate .ptop {
-      display: flex; align-items: center; justify-content: center; gap: 7px; flex-wrap: wrap;
-      width: 100%;
-    }
-    .plate .pcat {
-      font-size: 11px; letter-spacing: 3px; text-transform: uppercase; font-weight: 800;
-      opacity: .85;
-    }
-    .plate .plabel {
-      font-family: var(--serif); font-weight: 700; font-size: 25px; line-height: 1.08;
-      letter-spacing: .3px; margin: auto 0; max-width: 100%;
-      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
-    }
-    .plate .pents {
-      display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-width: 96%;
-    }
-    .plate .pents span {
-      font-family: ui-monospace, Menlo, monospace; font-size: 12px; font-weight: 700;
-      letter-spacing: .5px; background: rgba(255, 255, 255, .15);
-      border: 1px solid rgba(255, 255, 255, .32); border-radius: 4px; padding: 2px 8px;
+      position: relative; z-index: 2; display: flex; align-items: flex-start;
+      justify-content: space-between; gap: 8px; padding: 11px 12px 0;
     }
     .plate .pmark {
-      position: absolute; right: 13px; bottom: 11px; font-size: 9.5px; font-weight: 800;
-      letter-spacing: 2px; opacity: .45;
+      font-size: 9px; font-weight: 800; letter-spacing: 2px; opacity: .5; white-space: nowrap;
+      padding-top: 2px;
     }
-    .plate.sm .plabel { font-size: 16px; -webkit-line-clamp: 3; }
-    .plate.sm .pcat { font-size: 9.5px; letter-spacing: 2px; }
-    .plate.sm { gap: 6px; padding: 10px 11px 13px; }
+    /* centro: ícono de categoría + nombre + entidades */
+    .plate .pmid {
+      position: relative; z-index: 2; flex: 1; min-height: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 9px; padding: 4px 14px 14px; text-align: center;
+    }
+    .plate .picon { width: 50px; height: 50px; opacity: .96; flex-shrink: 0; }
+    .plate .picon path, .plate .picon circle, .plate .picon rect {
+      stroke: #fff; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round;
+    }
+    .plate .pname {
+      font-family: var(--serif); font-weight: 700; font-size: 21px; letter-spacing: .4px;
+      line-height: 1;
+    }
+    .plate .pents {
+      display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-width: 100%;
+    }
+    .plate .pents span {
+      font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; font-weight: 700;
+      letter-spacing: .5px; background: rgba(255, 255, 255, .16);
+      border: 1px solid rgba(255, 255, 255, .34); border-radius: 4px; padding: 2px 8px;
+    }
+    .plate.sm .picon { width: 36px; height: 36px; }
+    .plate.sm .pname { font-size: 16px; }
+    .plate.sm .pmid { gap: 7px; padding: 2px 11px 11px; }
     .plate.sm .pents span { font-size: 10.5px; padding: 1px 6px; }
 
     /* overlay de badges SOLO sobre fotos reales (esquina superior izquierda) */
@@ -768,13 +774,31 @@
     const sevName = s => s === 'crítico' ? 'Última hora' : s === 'importante' ? 'Actualización' : 'Info';
     function badges(e) { return `<span class="sev ${e.sev}">${sevName(e.sev)}</span>${e.puj ? '<span class="pujtag">PUJ</span>' : ''}`; }
     // Ficha de inteligencia (respaldo sin foto): categoría + entidades reales de la nota.
+    // Íconos line-art por categoría (sin emoji): identidad visual de la ficha de respaldo.
+    const PICON = {
+      operaciones: '<path d="M19 9h10l3 13H16z"/><path d="M21 22v18M27 22v18"/><path d="M24 9V4"/><path d="M15 6q-3 3 0 6M33 6q3 3 0 6"/>',
+      seguridad: '<path d="M24 5l15 5v12c0 10-8 16-15 18-7-2-15-8-15-18V10z"/><path d="M17 24l5 5 9-11"/>',
+      meteo: '<path d="M16 33h18a7 7 0 001-14 9 9 0 00-17-2 7 7 0 00-2 16z"/><path d="M23 31l-4 8h5l-3 7"/>',
+      rutas: '<path d="M10 35q14-30 28 0" stroke-dasharray="3 4"/><circle cx="10" cy="35" r="3"/><circle cx="38" cy="35" r="3"/><path d="M24 13l3 6-3-1.5L21 19z"/>',
+      industria: '<path d="M8 40V27a16 11 0 0132 0v13z"/><path d="M16 40v-9M24 40v-11M32 40v-9"/>',
+      regulatorio: '<path d="M15 6h13l6 6v30H15z"/><path d="M28 6v6h6"/><path d="M19 23h11M19 29h11M19 35h7"/>',
+      tecnologia: '<rect x="16" y="16" width="16" height="16" rx="2"/><path d="M21 16v-6M27 16v-6M21 38v-6M27 38v-6M16 21h-6M16 27h-6M38 21h6M38 27h6"/>',
+    };
+    const piconOf = c => PICON[c] || PICON.operaciones;
+    const PBG = '<svg class="pbg" viewBox="0 0 400 220" preserveAspectRatio="xMidYMid slice"><g fill="none" stroke="#fff" stroke-width="1.4"><path d="M-20 195Q200 35 425 175" stroke-dasharray="4 7"/><path d="M-20 140Q230 -15 445 115" stroke-dasharray="3 8"/><circle cx="70" cy="168" r="3.5"/><circle cx="330" cy="118" r="3.5"/></g></svg>';
+
+    // Ficha de inteligencia (respaldo sin foto): diseño con ícono + categoría + entidades reales.
     function plate(e, sm) {
       const ents = (e.ent && e.ent.length)
         ? `<div class="pents">${e.ent.map(c => `<span>${esc(c)}</span>`).join('')}</div>` : '';
       return `<div class="plate ${sm ? 'sm' : ''}">
-        <div class="ptop">${badges(e)}<span class="pcat">${catOf(e.cat).label}</span></div>
-        <div class="plabel">${esc(e.title).slice(0, sm ? 90 : 130)}</div>
-        ${ents}<div class="pmark">AEROINTEL</div></div>`;
+        ${PBG}
+        <div class="ptop">${badges(e)}<span class="pmark">AEROINTEL</span></div>
+        <div class="pmid">
+          <svg class="picon" viewBox="0 0 48 48">${piconOf(e.cat)}</svg>
+          <div class="pname">${catOf(e.cat).label}</div>${ents}
+        </div>
+      </div>`;
     }
     // Chips de entidades bajo el titular (aerolínea/aeropuerto/aeronave/ruta).
     function chips(e) {
