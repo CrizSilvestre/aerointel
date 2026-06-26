@@ -51,30 +51,84 @@
       box-shadow: 0 0 40px rgba(20, 30, 55, .06);
     }
 
-    /* ── Masthead ── */
+    /* ── Masthead / Top Bar ── */
     .util {
       display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 8px 14px;
-      padding: 8px 22px;
-      border-bottom: 1px solid var(--line);
+      flex-direction: column;
       font-size: 12px;
       color: var(--muted);
     }
 
+    /* Row 1: Weather strip — dark navy bar */
+    .util-top {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      padding: 10px 24px;
+      background: linear-gradient(135deg, #16284a 0%, #1e3a62 100%);
+      color: rgba(255,255,255,.85);
+    }
+    .util-top .wx { color: rgba(255,255,255,.9); }
+    .util-top .wx-date { color: #fff; font-weight: 700; font-size: 13px; }
+    .util-top .wx-clock {
+      background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18);
+      color: #fff; font-size: 13.5px;
+    }
+    .util-top .wx-sep { color: rgba(255,255,255,.25); }
+    .util-top .wx-pill {
+      background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18);
+    }
+    .util-top .wx-loc {
+      background: rgba(255,255,255,.22); color: #fff;
+    }
+    .util-top .wx-temp { color: rgba(255,255,255,.7); }
+    .util-top .wx-temp b { color: #fff; font-size: 16px; }
+    .util-top .wx-cond { color: #fff; }
+    .util-top .wx-wind { color: rgba(255,255,255,.7); border-left-color: rgba(255,255,255,.2); }
+    .util-top .wx-wind b { color: #fff; }
+    .util-top .wx-wind .arrow { color: rgba(255,255,255,.8); }
+    .util-top .wx-wind .rwy { color: #ffd54a; }
+    .util-top .right-top {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .util-top .live { color: rgba(255,255,255,.8); }
+
+    /* Row 2: Actions strip — light bar */
+    .util-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 24px;
+      background: #f6f8fc;
+      border-bottom: 1px solid var(--line);
+      flex-wrap: wrap;
+    }
+    .util-actions .act-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .util-actions .act-sep {
+      width: 1px;
+      height: 18px;
+      background: var(--line);
+      margin: 0 4px;
+    }
+    .util-actions .stats {
+      margin-left: auto;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .util-actions .stats b { font-weight: 800; }
+
     .util .dot {
       color: var(--accent);
       font-weight: 800;
-    }
-
-    .util .right {
-      margin-left: auto;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px 14px;
-      align-items: center;
-      justify-content: flex-end;
     }
 
     .util .ver {
@@ -580,7 +634,7 @@
     .wx {
       display: flex;
       align-items: center;
-      gap: 11px;
+      gap: 12px;
       font-size: 13px;
       color: var(--ink);
       flex-wrap: wrap;
@@ -589,13 +643,13 @@
     .wx-clock {
       font-family: ui-monospace, Menlo, monospace; font-weight: 700; font-size: 13px;
       color: var(--navy); background: #eef1f7; border: 1px solid var(--line);
-      border-radius: 6px; padding: 2px 8px; letter-spacing: .5px;
+      border-radius: 6px; padding: 3px 9px; letter-spacing: .5px;
     }
     .wx-clock .ampm { font-size: 9px; color: var(--muted); margin-left: 2px; }
     .wx-sep { color: var(--line); }
     .wx-pill {
       display: inline-flex; align-items: center; flex-wrap: nowrap; gap: 8px; white-space: nowrap;
-      background: #f0f4fa; border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px 3px 4px;
+      background: #f0f4fa; border: 1px solid var(--line); border-radius: 999px; padding: 4px 13px 4px 5px;
     }
     .wx-cond { white-space: nowrap; }
     .wx-wind, .wx-temp { white-space: nowrap; }
@@ -603,12 +657,20 @@
       font-size: 10px; font-weight: 800; letter-spacing: .6px; color: #fff;
       background: var(--navy); border-radius: 999px; padding: 3px 8px;
     }
-    .wx-ico { font-size: 16px; line-height: 1; }
-    .wx-temp { color: var(--muted); font-size: 12px; display: inline-flex; align-items: baseline; gap: 4px; }
-    .wx-temp b { color: var(--ink); font-weight: 800; font-size: 15px; }
+    /* Emoji de clima: fondo claro para que TODOS los colores del emoji sean visibles
+       sobre el fondo navy oscuro (emojis como ⛈️ tienen nubes oscuras que desaparecen). */
+    .wx-ico {
+      font-size: 20px; line-height: 1;
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 30px; height: 30px; border-radius: 50%;
+      background: rgba(255,255,255,.92);
+      flex-shrink: 0;
+    }
+    .wx-temp { color: var(--muted); font-size: 12.5px; display: inline-flex; align-items: baseline; gap: 4px; }
+    .wx-temp b { color: var(--ink); font-weight: 800; font-size: 16px; }
     .wx-cond { color: var(--ink); font-weight: 600; }
     .wx-wind {
-      display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted);
+      display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--muted);
       border-left: 1px solid var(--line); padding-left: 8px; font-weight: 600;
     }
     .wx-wind b { color: var(--ink); font-weight: 800; }
@@ -644,10 +706,11 @@
     /* ── Botón traducir ── */
     .trans-btn {
       border: 1px solid var(--line); background: #fff; color: var(--navy); font: inherit;
-      font-weight: 700; font-size: 12px; padding: 5px 10px; border-radius: 7px; cursor: pointer;
+      font-weight: 700; font-size: 12.5px; padding: 6px 13px; border-radius: 8px; cursor: pointer;
       display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+      transition: all .15s ease;
     }
-    .trans-btn:hover { border-color: var(--navy2); }
+    .trans-btn:hover { border-color: var(--navy2); background: #f0f4fa; }
     .trans-btn.on { background: #eaf2ff; border-color: var(--navy2); }
 
     /* etiqueta NUEVO para notas muy recientes (≤3 h) → sensación de "en vivo" */
@@ -656,22 +719,24 @@
     /* ── Botón "Resumen → Mattermost" ── */
     .mm-btn {
       border: 0;
-      background: var(--navy);
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy2) 100%);
       color: #fff;
       font: inherit;
       font-weight: 700;
       font-size: 12.5px;
       letter-spacing: .2px;
-      padding: 6px 12px;
-      border-radius: 7px;
+      padding: 7px 14px;
+      border-radius: 8px;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       gap: 6px;
       white-space: nowrap;
+      transition: all .15s ease;
+      box-shadow: 0 2px 6px rgba(22,40,74,.2);
     }
-    .mm-btn:hover { background: var(--navy2); }
-    .mm-btn:active { transform: translateY(1px); }
+    .mm-btn:hover { background: linear-gradient(135deg, var(--navy2) 0%, #2d5599 100%); box-shadow: 0 3px 10px rgba(22,40,74,.28); }
+    .mm-btn:active { transform: translateY(1px); box-shadow: 0 1px 3px rgba(22,40,74,.18); }
     .stats { white-space: nowrap; }
 
     /* ── Toast de confirmación ── */
@@ -706,9 +771,13 @@
     /* ── Responsive: móvil (la app es muy usable desde el teléfono) ── */
     @media(max-width:600px) {
       .wrap { padding: 14px; }
-      .util { flex-wrap: wrap; gap: 8px 12px; padding: 8px 14px; }
-      .util .right { margin-left: 0; width: 100%; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
-      .util .ver { display: none; }   /* la fecha ya está en el strip de clima */
+      .util-top { padding: 8px 14px; gap: 8px 10px; }
+      .util-top .right-top { margin-left: 0; width: 100%; justify-content: space-between; gap: 8px 10px; flex-wrap: wrap; }
+      .util-actions { padding: 6px 14px; gap: 8px; flex-wrap: wrap; }
+      .util-actions .act-sep { display: none; }
+      .util-actions .stats { margin-left: 0; width: 100%; font-size: 11px; }
+      .wx-ico { width: 26px; height: 26px; font-size: 17px; }
+      .util .ver { display: none; }
       .masthead { padding: 12px 14px 10px; }
       .masthead h1 { font-size: 27px; }
       .masthead .kicker { font-size: 10px; letter-spacing: 2px; }
@@ -726,8 +795,10 @@
       .card .why { font-size: 13.5px; -webkit-line-clamp: 4; }
       .ticker a { font-size: 12px; }
       .stats { font-size: 11px; }
-      .wx-wind { display: none; }       /* el detalle de viento es un extra de escritorio */
+      .wx-wind { display: none; }
       .wx-pill { flex-wrap: wrap; white-space: normal; }
+      .mm-btn { font-size: 12px; padding: 6px 10px; }
+      .trans-btn { font-size: 12px; padding: 5px 10px; }
     }
 
     @media(max-width:380px) {
@@ -741,25 +812,32 @@
 <body>
   <div class="paper">
     <div class="util">
-      <div class="wx">
-        <span class="wx-date" id="today"></span>
-        <span class="wx-clock" id="clock" title="Hora local · República Dominicana (AST, UTC−4)">--:--:--</span>
-        <span class="wx-sep">│</span>
-        <span class="wx-pill" title="Condiciones actuales en el Aeropuerto Internacional de Punta Cana">
-          <span class="wx-loc">PUJ</span>
-          <span class="wx-ico" id="wx-ico">✈️</span>
-          <span class="wx-temp" id="wx-temp">—</span>
-          <span class="wx-cond" id="wx-cond">Punta Cana</span>
-          <span class="wx-wind" id="wx-wind" title="Viento — relevante para la pista en uso"></span>
+      <div class="util-top">
+        <div class="wx">
+          <span class="wx-date" id="today"></span>
+          <span class="wx-clock" id="clock" title="Hora local · República Dominicana (AST, UTC−4)">--:--:--</span>
+          <span class="wx-sep">│</span>
+          <span class="wx-pill" title="Condiciones actuales en el Aeropuerto Internacional de Punta Cana">
+            <span class="wx-loc">PUJ</span>
+            <span class="wx-ico" id="wx-ico">—</span>
+            <span class="wx-temp" id="wx-temp">—</span>
+            <span class="wx-cond" id="wx-cond">Cargando…</span>
+            <span class="wx-wind" id="wx-wind" title="Viento — relevante para la pista en uso"></span>
+          </span>
+        </div>
+        <span class="right-top">
+          <span class="live" id="live" title="Estado de la actualización automática"><span class="livedot"></span> EN VIVO · <span id="liveupd">…</span></span>
         </span>
       </div>
-      <span class="right">
-        <span class="live" id="live" title="Estado de la actualización automática"><span class="livedot"></span> EN VIVO · <span id="liveupd">…</span></span>
-        <button class="trans-btn" id="trans-btn" title="Traducir titulares al español (en el navegador)">🌐 Traducir</button>
-        <button class="mm-btn" id="mm-btn" title="Copia un resumen estructurado y abre Mattermost">🛰️ Resumen → Mattermost</button>
+      <div class="util-actions">
+        <div class="act-group">
+          <button class="trans-btn" id="trans-btn" title="Traducir titulares al español (en el navegador)">🌐 Traducir</button>
+          <button class="mm-btn" id="mm-btn" title="Copia un resumen estructurado y abre Mattermost">🛰️ Resumen → Mattermost</button>
+        </div>
+        <span class="act-sep"></span>
         <span class="stats"><b id="s-total">0</b> historias · <b id="s-break" style="color:var(--crit)">0</b> última hora · <b
             id="s-puj" style="color:#b88600">0</b> PUJ</span>
-      </span>
+      </div>
     </div>
     <div class="masthead">
       <div class="kicker">Edición PUJ · República Dominicana</div>
