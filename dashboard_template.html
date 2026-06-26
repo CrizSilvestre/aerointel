@@ -550,6 +550,44 @@
     .wx-ico { font-size: 16px; line-height: 1; }
     .wx-cond { color: var(--muted); }
 
+    /* ── Indicador EN VIVO (estado de la automatización) ── */
+    .live { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+    .livedot { width: 8px; height: 8px; border-radius: 50%; background: #1faf6a; box-shadow: 0 0 0 0 rgba(31, 175, 106, .6); animation: pulse 2.4s infinite; flex-shrink: 0; }
+    .live.warn .livedot { background: #d98a00; animation: none; }
+    .live.stale .livedot { background: var(--crit); animation: none; }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(31, 175, 106, .5); }
+      70% { box-shadow: 0 0 0 7px rgba(31, 175, 106, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(31, 175, 106, 0); }
+    }
+
+    /* ── Barra de filtros de tiempo ── */
+    .timebar {
+      display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+      padding: 9px 22px; background: #f6f8fc; border-bottom: 1px solid var(--line);
+    }
+    .timebar .tlabel { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-right: 2px; }
+    .timebar button {
+      border: 1px solid var(--line); background: #fff; color: var(--navy);
+      font: inherit; font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 999px; cursor: pointer;
+    }
+    .timebar button:hover { border-color: var(--navy2); }
+    .timebar button.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+    .timecount { margin-left: auto; font-size: 11.5px; color: var(--muted); }
+    .timecount b { color: var(--navy); }
+
+    /* ── Botón traducir ── */
+    .trans-btn {
+      border: 1px solid var(--line); background: #fff; color: var(--navy); font: inherit;
+      font-weight: 700; font-size: 12px; padding: 5px 10px; border-radius: 7px; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+    }
+    .trans-btn:hover { border-color: var(--navy2); }
+    .trans-btn.on { background: #eaf2ff; border-color: var(--navy2); }
+
+    /* etiqueta NUEVO para notas muy recientes (≤3 h) → sensación de "en vivo" */
+    .nuevo { font-size: 9.5px; font-weight: 800; background: #1faf6a; color: #fff; border-radius: 3px; padding: 1px 5px; letter-spacing: .4px; text-transform: uppercase; }
+
     /* ── Botón "Resumen → Mattermost" ── */
     .mm-btn {
       border: 0;
@@ -644,10 +682,11 @@
         <span class="wx-cond" id="wx-cond">Punta Cana</span>
       </div>
       <span class="right">
+        <span class="live" id="live" title="Estado de la actualización automática"><span class="livedot"></span> EN VIVO · <span id="liveupd">…</span></span>
+        <button class="trans-btn" id="trans-btn" title="Traducir titulares al español (en el navegador)">🌐 Traducir</button>
         <button class="mm-btn" id="mm-btn" title="Copia un resumen estructurado y abre Mattermost">🛰️ Resumen → Mattermost</button>
         <span class="stats"><b id="s-total">0</b> historias · <b id="s-break" style="color:var(--crit)">0</b> última hora · <b
             id="s-puj" style="color:#b88600">0</b> PUJ</span>
-        <span class="ver" id="ver">v</span>
       </span>
     </div>
     <div class="masthead">
@@ -659,6 +698,16 @@
     <nav class="sections" id="nav"></nav>
     <div class="ticker"><span class="lab">Última hora</span>
       <div class="track" id="ticker"></div>
+    </div>
+    <div class="timebar" id="timebar">
+      <span class="tlabel">Mostrar</span>
+      <button data-tf="1">Última hora</button>
+      <button data-tf="3">3 h</button>
+      <button data-tf="today">Hoy</button>
+      <button data-tf="24">24 h</button>
+      <button data-tf="168">7 días</button>
+      <button data-tf="all" class="on">Todo</button>
+      <span class="timecount" id="timecount"></span>
     </div>
 
     <div class="wrap" id="main"></div>
@@ -683,10 +732,36 @@
     const grad = c => { const g = catOf(c).g; return `background:linear-gradient(135deg,${g[0]},${g[1]});color:#fff;`; };
     const esc = s => String(s == null ? '' : s);
 
+    // ── Frescura: la antigüedad se calcula EN VIVO desde el ISO de publicación (UTC) ──
+    const BUILD_ISO = '__BUILD_ISO__';
+    function ageH(iso) { if (!iso) return null; const t = Date.parse(iso); return isNaN(t) ? null : (Date.now() - t) / 3.6e6; }
+    function agoText(iso) {
+      const h = ageH(iso); if (h == null) return 'fecha s/d';
+      const m = h * 60;
+      if (m < 1) return 'ahora'; if (m < 60) return `hace ${Math.round(m)} min`;
+      if (h < 24) return `hace ${Math.round(h)} h`;
+      const d = Math.floor(h / 24); return d === 1 ? 'ayer' : `hace ${d} días`;
+    }
+    const isRecent = (e, h) => { const a = ageH(e.iso); return a != null && a <= h; };
+    // "Última hora" REAL = severidad elevada Y publicada en las últimas 24 h (no notas viejas).
+    const isBreaking = e => e.sev !== 'info' && isRecent(e, 24);
+    const freshTag = e => ((ageH(e.iso) ?? 99) < 3) ? '<span class="nuevo">Nuevo</span> ' : '';
+
     document.getElementById('s-total').textContent = EVENTS.length;
-    document.getElementById('s-break').textContent = EVENTS.filter(e => e.sev === 'crítico').length;
+    document.getElementById('s-break').textContent = EVENTS.filter(isBreaking).length;
     document.getElementById('s-puj').textContent = EVENTS.filter(e => e.puj).length;
-    document.getElementById('ver').textContent = '__UPDATED__'.split(' ').slice(0, 3).join(' ');
+
+    // ── Indicador EN VIVO: "actualizado hace X" desde la hora de build, color por frescura ──
+    function liveTick() {
+      const el = document.getElementById('liveupd'), box = document.getElementById('live');
+      const h = ageH(BUILD_ISO);
+      if (h == null) { el.textContent = '—'; return; }
+      const m = h * 60;
+      el.textContent = m < 1 ? 'recién' : m < 60 ? `hace ${Math.round(m)} min` : `hace ${Math.round(h)} h`;
+      box.classList.toggle('warn', h > 1.5 && h <= 4);
+      box.classList.toggle('stale', h > 4);
+    }
+    setInterval(liveTick, 30000); liveTick();
     // ── Fecha (estilo "26 de junio del 2026") ──
     const _MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
     (function () { const n = new Date(); document.getElementById('today').textContent = `${n.getDate()} de ${_MESES[n.getMonth()]} del ${n.getFullYear()}`; })();
@@ -754,12 +829,32 @@
       window.open(MM_URL, '_blank', 'noopener');   // misma activación de usuario → el navegador no lo bloquea
     });
 
-    // ticker: últimas/críticas (duplicado para loop continuo)
+    // ticker: SOLO última hora real (reciente), ordenado del más nuevo al más viejo
     (function () {
-      const hot = EVENTS.filter(e => e.sev !== 'info').slice(0, 12);
-      const html = hot.map(e => `<a href="${esc(e.link)}" target="_blank" rel="noopener"><b>${catOf(e.cat).label.toUpperCase()}:</b> ${esc(e.title)}</a>`).join('');
-      document.getElementById('ticker').innerHTML = html + html;
+      const hot = EVENTS.filter(isBreaking).sort((a, b) => (ageH(a.iso) ?? 1e9) - (ageH(b.iso) ?? 1e9)).slice(0, 12);
+      const tk = document.getElementById('ticker');
+      if (!hot.length) {
+        tk.innerHTML = '<a style="color:var(--muted);cursor:default">Sin alertas de última hora en las últimas 24 h · vigilancia activa</a>';
+        tk.style.animation = 'none'; return;
+      }
+      const html = hot.map(e => `<a href="${esc(e.link)}" target="_blank" rel="noopener"><b>${catOf(e.cat).label.toUpperCase()}:</b> ${esc(e.title)} <span style="opacity:.7">· ${agoText(e.iso)}</span></a>`).join('');
+      tk.innerHTML = html + html;
     })();
+
+    // ── Filtro de tiempo (respeta la fecha de publicación real) ──
+    let timeFilter = 'all';
+    function timeOK(e) {
+      if (timeFilter === 'all') return true;
+      const a = ageH(e.iso);
+      if (a == null) return false;
+      if (timeFilter === 'today') { const d = new Date(); d.setHours(0, 0, 0, 0); return Date.parse(e.iso) >= d.getTime(); }
+      return a <= timeFilter;
+    }
+    document.querySelectorAll('#timebar button').forEach(b => b.addEventListener('click', () => {
+      const v = b.dataset.tf; timeFilter = (v === 'all' || v === 'today') ? v : Number(v);
+      document.querySelectorAll('#timebar button').forEach(x => x.classList.toggle('on', x === b));
+      render();
+    }));
 
     // nav
     const cats = [...new Set(EVENTS.map(e => e.cat))];
@@ -816,7 +911,7 @@
       </a>
       <div class="row" style="margin-top:11px;display:flex;gap:9px;align-items:center;font-size:11.5px;color:var(--muted)">
         <span class="cat" style="font-weight:800;color:var(--navy);text-transform:uppercase;letter-spacing:.4px">${catOf(e.cat).label}</span>
-        <span>· ${esc(e.fecha)} · ${esc(e.source)}</span><span class="impactchip">${e.impact}/100</span>
+        ${freshTag(e)}<span>· ${agoText(e.iso)} · ${esc(e.source)}</span><span class="impactchip">${e.impact}/100</span>
       </div>
       <h2><a href="${esc(e.link)}" target="_blank" rel="noopener">${esc(e.title)}</a></h2>
       ${chips(e)}${e.resumen ? `<div class="deck">${esc(e.resumen)}</div>` : ''}
@@ -827,7 +922,7 @@
       return `<div class="rail"><div class="railhead">Lo más relevante</div>` + list.map(e => `
       <a class="it" href="${esc(e.link)}" target="_blank" rel="noopener">
         <div class="meta"><span class="sevdot" style="background:${e.sev === 'crítico' ? 'var(--crit)' : e.sev === 'importante' ? 'var(--imp)' : 'var(--info)'}"></span>
-          ${catOf(e.cat).label} · ${esc(e.fecha)} ${e.puj ? '· <b style="color:#b88600">PUJ</b>' : ''}</div>
+          ${freshTag(e)}${catOf(e.cat).label} · ${agoText(e.iso)} ${e.puj ? '· <b style="color:#b88600">PUJ</b>' : ''}</div>
         <h4>${esc(e.title)}</h4>
       </a>`).join('') + `</div>`;
     }
@@ -840,7 +935,7 @@
       <a class="thumb" style="${grad(e.cat)}" href="${esc(e.link)}" target="_blank" rel="noopener">
         ${imgMarkup}${hasImg ? `<div class="ovbadge">${badges(e)}</div>` : plate(e, true)}
       </a>
-      <div class="row"><span class="cat">${catOf(e.cat).label}</span><span>· ${esc(e.fecha)}</span><span class="impactchip">${e.impact}</span></div>
+      <div class="row">${freshTag(e)}<span class="cat">${catOf(e.cat).label}</span><span>· ${agoText(e.iso)}</span><span class="impactchip">${e.impact}</span></div>
       <h3><a href="${esc(e.link)}" target="_blank" rel="noopener">${esc(e.title)}</a></h3>
       ${chips(e)}<div class="why"><b>Por qué importa:</b> ${esc(e.why)}</div>
       <div class="foot">${e.n} fuente(s) · ${esc(e.source)} · <a href="${esc(e.link)}" target="_blank" rel="noopener">Ver fuente</a></div>
@@ -852,32 +947,92 @@
       <div class="grid">${list.map(cardHTML).join('')}</div></div>`;
     }
 
+    const byRecency = (a, b) => (ageH(a.iso) ?? 1e9) - (ageH(b.iso) ?? 1e9);
+    const emptyMsg = () => `<p style="color:var(--muted);padding:34px 0;text-align:center">No hay historias en este rango de tiempo. Prueba un rango más amplio.</p>`;
+
     function render() {
       [...nav.children].forEach(b => b.classList.toggle('active', b.dataset.k === view));
       const main = document.getElementById('main');
+      const tc = document.getElementById('timecount');
+
       if (view === 'portada') {
-        const lead = EVENTS[0];
-        let html = `<div class="lead">${heroHTML(lead)}${railHTML(EVENTS.slice(1, 6))}</div>`;
-        const used = new Set([lead, ...EVENTS.slice(1, 6)]);
+        const pool = EVENTS.filter(timeOK);
+        tc.innerHTML = `<b>${pool.length}</b> de ${EVENTS.length} historias`;
+        if (!pool.length) { main.innerHTML = emptyMsg(); if (transOn) applyTranslation(true); return; }
+        const lead = pool[0];
+        let html = `<div class="lead">${heroHTML(lead)}${railHTML(pool.slice(1, 6))}</div>`;
+        const used = new Set([lead, ...pool.slice(1, 6)]);
         const order = ['operaciones', 'seguridad', 'meteo', 'rutas', 'industria', 'regulatorio', 'tecnologia'];
         const seen = new Set();
         order.forEach(c => {
           seen.add(c);
-          const list = EVENTS.filter(e => e.cat === c && !used.has(e)).slice(0, 3);
-          html += sectionHTML(catOf(c).label, list);
+          html += sectionHTML(catOf(c).label, pool.filter(e => e.cat === c && !used.has(e)).slice(0, 3));
         });
         cats.filter(c => !seen.has(c)).forEach(c => {
-          html += sectionHTML(catOf(c).label, EVENTS.filter(e => e.cat === c && !used.has(e)).slice(0, 3));
+          html += sectionHTML(catOf(c).label, pool.filter(e => e.cat === c && !used.has(e)).slice(0, 3));
         });
         main.innerHTML = html;
       } else {
-        const f = view === 'breaking' ? (e => e.sev !== 'info') : view === 'puj' ? (e => e.puj) : (e => e.cat === view.slice(4));
-        const title = view === 'breaking' ? 'Última hora' : view === 'puj' ? 'Solo PUJ' : catOf(view.slice(4)).label;
-        const list = EVENTS.filter(f);
+        let list, title;
+        if (view === 'breaking') {
+          list = EVENTS.filter(e => isBreaking(e) && timeOK(e)).sort(byRecency);
+          title = 'Última hora (≤24 h)';
+        } else if (view === 'puj') {
+          list = EVENTS.filter(e => e.puj && timeOK(e)); title = 'Solo PUJ';
+        } else {
+          const c = view.slice(4); list = EVENTS.filter(e => e.cat === c && timeOK(e)); title = catOf(c).label;
+        }
+        tc.innerHTML = `<b>${list.length}</b> ${list.length === 1 ? 'historia' : 'historias'}`;
         main.innerHTML = `<div class="section"><div class="section-h"><span class="t">${title}</span><span class="rule"></span></div>
-        <div class="grid">${list.map(cardHTML).join('') || '<p style="color:var(--muted)">Sin notas en esta sección.</p>'}</div></div>`;
+        <div class="grid">${list.map(cardHTML).join('') || emptyMsg()}</div></div>`;
+      }
+      if (transOn) applyTranslation(true);
+    }
+
+    // ── Traducción NATIVA del navegador (on-device, sin costo de API). Progressive enhancement. ──
+    // Usa el motor de traducción integrado de Chrome (Translator API). Si no está, sugiere el
+    // traductor nativo del navegador. Conserva el original (data-orig) para volver atrás.
+    let transOn = false, _translator = null; const _transCache = new Map();
+    const transBtn = document.getElementById('trans-btn');
+    const EN_RE = /\b(the|of|to|in|on|at|and|for|as|after|with|amid|from|by|is|are|its|it|new|more|over|than|this|that|flight|flights|airport|airline|airlines|air|crash|delay|delays|cancel|cancelled|canceled|service|network|route|routes|stranded|disruption|disrupted|travel|passengers|nonstop|growing|hundreds|emergency|landing|runway|joins|maintains|advisory)\b/i;
+    const ES_RE = /\b(de|la|el|los|las|en|por|para|con|que|del|una|un|vuelo|vuelos|aeropuerto|nueva|nuevo|ruta|rutas|aerolínea|huelga|cancela|retraso|reportan)\b/i;
+    const looksEnglish = s => EN_RE.test(s) && !ES_RE.test(s);
+    async function getTranslator() {
+      if (_translator) return _translator;
+      try {
+        if (typeof Translator === 'undefined') return null;
+        const av = await Translator.availability({ sourceLanguage: 'en', targetLanguage: 'es' });
+        if (av === 'unavailable') return null;
+        _translator = await Translator.create({ sourceLanguage: 'en', targetLanguage: 'es' });
+        return _translator;
+      } catch (e) { return null; }
+    }
+    async function applyTranslation(on) {
+      const nodes = [...document.querySelectorAll('#main h2 a, #main h3 a, #main h4, #main .deck, .ticker a')];
+      if (!on) { nodes.forEach(n => { if (n.dataset.orig != null) n.textContent = n.dataset.orig; }); return; }
+      const tr = await getTranslator();
+      if (!tr) {
+        transOn = false; transBtn.classList.remove('on'); transBtn.textContent = '🌐 Traducir';
+        toast('Tu navegador no tiene traducción integrada. Usa el traductor del navegador (clic derecho → Traducir al español).');
+        return;
+      }
+      for (const n of nodes) {
+        const base = (n.dataset.orig != null ? n.dataset.orig : n.textContent).trim();
+        if (!looksEnglish(base)) continue;
+        if (n.dataset.orig == null) n.dataset.orig = n.textContent;
+        try {
+          if (!_transCache.has(base)) _transCache.set(base, await tr.translate(base));
+          n.textContent = _transCache.get(base);
+        } catch (e) { }
       }
     }
+    transBtn.addEventListener('click', async () => {
+      transOn = !transOn;
+      transBtn.classList.toggle('on', transOn);
+      transBtn.textContent = transOn ? '🌐 Original' : '🌐 Traducir';
+      await applyTranslation(transOn);
+    });
+
     render();
     setTimeout(() => location.reload(), 5 * 60 * 1000);
   </script>

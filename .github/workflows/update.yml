@@ -1,10 +1,12 @@
 name: AeroIntel update
 
-# Pipeline autónomo: cada hora recolecta, analiza, puntúa, genera el periódico y lo
-# despliega en GitHub Pages (y publica lo crítico a Mattermost si está configurado).
+# Pipeline autónomo: recolecta, analiza, puntúa, genera el periódico y lo despliega en
+# GitHub Pages (y publica lo crítico a Mattermost si está configurado).
 on:
   schedule:
-    - cron: "17 * * * *"        # cada hora (min 17 para evitar congestión del cron de GH)
+    # Cada 15 min. El cron de GitHub se retrasa/salta bajo carga, así que programar más
+    # seguido da más corridas efectivas → frescura real. Repo público = minutos gratis.
+    - cron: "*/15 * * * *"
   workflow_dispatch: {}          # permite correrlo a mano desde Actions
 
 permissions:

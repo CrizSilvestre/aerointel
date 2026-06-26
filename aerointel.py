@@ -594,9 +594,11 @@ def apply_ranking_adjustments(ev):
         a["titular"] = clean_title(ev["items"][0]["title"])
     age = age_hours(ev.get("dt"))
     is_noise = bool(NOISE_RE.search(txt))
-    # Recencia (única fuente de verdad para ambos caminos de análisis)
+    # Recencia con peso FUERTE: la portada debe sentirse viva. Lo muy reciente sube; lo viejo
+    # (>2 días) se hunde aunque sea importante, para que un evento de hace 4 días no lidere.
     if age is not None:
-        a["impact_score"] += 10 if age < 6 else 6 if age < 24 else 2 if age < 72 else -4 if age < 168 else -12
+        a["impact_score"] += (16 if age < 3 else 11 if age < 12 else 6 if age < 24 else
+                              0 if age < 48 else -12 if age < 96 else -22 if age < 168 else -34)
     # Ruido turístico/marketing: tope duro. Aunque mencione "hurricane"/"Caribbean" (lo que le daría
     # severidad alta), un artículo de reservas/turismo nunca debe superar el umbral de publicación.
     if is_noise:
@@ -773,11 +775,15 @@ def write_dashboard(events):
              "impact": ev["analysis"]["impact_score"], "puj": bool(ev["analysis"].get("affects_puj")),
              "why": ev["analysis"]["angulo_editorial"], "resumen": ev["analysis"].get("resumen", ""),
              "fecha": human_age(ev.get("dt")), "img": ev.get("image_url"),
+             # iso = publicación en UTC marcada con 'Z' → el navegador calcula la antigüedad EN VIVO
+             "iso": (ev["dt"].isoformat() + "Z") if ev.get("dt") else None,
              "ent": entity_chips(ev["analysis"])} for ev in events]
     mm_url = os.environ.get("MATTERMOST_WEB_URL", "https://chatroom.grupopuntacana.com/")
+    build_iso = datetime.utcnow().isoformat(timespec="seconds") + "Z"   # hora de generación (UTC)
     out = (open(tpl_path, encoding="utf-8").read()
            .replace("/*DATA*/", json.dumps(data, ensure_ascii=False))
            .replace("__UPDATED__", f"{datetime.now():%d %b %Y %H:%M}")
+           .replace("__BUILD_ISO__", build_iso)
            .replace("__MM_URL__", mm_url))
     with open(os.path.join(OUT, "dashboard.html"), "w", encoding="utf-8") as f:
         f.write(out)
