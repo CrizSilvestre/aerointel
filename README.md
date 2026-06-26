@@ -8,6 +8,8 @@ la operación de PUJ?"*.
 
 > Estado: **beta funcional**. Hub coordinado: **PUJ** (Aeropuerto Internacional de Punta Cana).
 > También cubre SDQ / STI / POP y aviación global cuando impacta a RD/Caribe.
+>
+> **En vivo:** https://crizsilvestre.github.io/aerointel/ · API: `/api/news/latest.json`
 
 ---
 
