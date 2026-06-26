@@ -774,9 +774,11 @@ def write_dashboard(events):
              "why": ev["analysis"]["angulo_editorial"], "resumen": ev["analysis"].get("resumen", ""),
              "fecha": human_age(ev.get("dt")), "img": ev.get("image_url"),
              "ent": entity_chips(ev["analysis"])} for ev in events]
+    mm_url = os.environ.get("MATTERMOST_WEB_URL", "https://chatroom.grupopuntacana.com/")
     out = (open(tpl_path, encoding="utf-8").read()
            .replace("/*DATA*/", json.dumps(data, ensure_ascii=False))
-           .replace("__UPDATED__", f"{datetime.now():%d %b %Y %H:%M}"))
+           .replace("__UPDATED__", f"{datetime.now():%d %b %Y %H:%M}")
+           .replace("__MM_URL__", mm_url))
     with open(os.path.join(OUT, "dashboard.html"), "w", encoding="utf-8") as f:
         f.write(out)
 

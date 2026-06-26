@@ -518,18 +518,101 @@
       text-align: center;
     }
 
+    /* ── Strip de clima (Punta Cana, en vivo) ── */
+    .wx {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 13px;
+      color: var(--ink);
+      flex-wrap: wrap;
+    }
+    .wx-date { font-weight: 500; }
+    .wx-sep { color: var(--line); }
+    .wx-temp { color: var(--muted); }
+    .wx-temp b { color: var(--ink); font-weight: 800; font-size: 14px; }
+    .wx-ico { font-size: 16px; line-height: 1; }
+    .wx-cond { color: var(--muted); }
+
+    /* ── Botón "Resumen → Mattermost" ── */
+    .mm-btn {
+      border: 0;
+      background: var(--navy);
+      color: #fff;
+      font: inherit;
+      font-weight: 700;
+      font-size: 12.5px;
+      letter-spacing: .2px;
+      padding: 6px 12px;
+      border-radius: 7px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .mm-btn:hover { background: var(--navy2); }
+    .mm-btn:active { transform: translateY(1px); }
+    .stats { white-space: nowrap; }
+
+    /* ── Toast de confirmación ── */
+    .toast {
+      position: fixed;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--ink);
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 9px;
+      font-size: 13px;
+      font-weight: 600;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .25s, transform .25s;
+      z-index: 60;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, .28);
+      max-width: 90vw;
+      text-align: center;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── Responsive: tablet ── */
     @media(max-width:820px) {
-      .lead {
-        grid-template-columns: 1fr;
-      }
+      .lead { grid-template-columns: 1fr; gap: 18px; }
+      .grid { grid-template-columns: 1fr 1fr; gap: 14px; }
+      .masthead h1 { font-size: 34px; }
+    }
 
-      .grid {
-        grid-template-columns: 1fr;
-      }
+    /* ── Responsive: móvil (la app es muy usable desde el teléfono) ── */
+    @media(max-width:600px) {
+      .wrap { padding: 14px; }
+      .util { flex-wrap: wrap; gap: 8px 12px; padding: 8px 14px; }
+      .util .right { margin-left: 0; width: 100%; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
+      .util .ver { display: none; }   /* la fecha ya está en el strip de clima */
+      .masthead { padding: 12px 14px 10px; }
+      .masthead h1 { font-size: 27px; }
+      .masthead .kicker { font-size: 10px; letter-spacing: 2px; }
+      .masthead .sub { font-size: 11px; }
+      /* nav: barra deslizable horizontal en vez de envolver */
+      nav.sections { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; -webkit-overflow-scrolling: touch; }
+      nav.sections::-webkit-scrollbar { display: none; }
+      nav.sections button { flex: 0 0 auto; padding: 11px 14px; }
+      .grid { grid-template-columns: 1fr; gap: 16px; }
+      .hero .cover { aspect-ratio: 16/10; }
+      .hero h2 { font-size: 25px; }
+      .hero .deck { font-size: 14.5px; }
+      .plate .plabel { font-size: 22px; }
+      .card h3 { font-size: 18px; }
+      .card .why { font-size: 13.5px; -webkit-line-clamp: 4; }
+      .ticker a { font-size: 12px; }
+      .stats { font-size: 11px; }
+    }
 
-      .masthead h1 {
-        font-size: 34px;
-      }
+    @media(max-width:380px) {
+      .masthead h1 { font-size: 23px; }
+      .wx { font-size: 12px; }
+      .mm-btn { font-size: 12px; padding: 6px 10px; }
     }
   </style>
 </head>
@@ -537,9 +620,16 @@
 <body>
   <div class="paper">
     <div class="util">
-      <span id="today"></span> <span class="dot">·</span> <span>Inteligencia aeronáutica autónoma</span>
+      <div class="wx">
+        <span class="wx-date" id="today"></span>
+        <span class="wx-sep">│</span>
+        <span class="wx-temp" id="wx-temp">—</span>
+        <span class="wx-ico" id="wx-ico">✈️</span>
+        <span class="wx-cond" id="wx-cond">Punta Cana</span>
+      </div>
       <span class="right">
-        <span><b id="s-total">0</b> historias · <b id="s-break" style="color:var(--crit)">0</b> última hora · <b
+        <button class="mm-btn" id="mm-btn" title="Copia un resumen estructurado y abre Mattermost">🛰️ Resumen → Mattermost</button>
+        <span class="stats"><b id="s-total">0</b> historias · <b id="s-break" style="color:var(--crit)">0</b> última hora · <b
             id="s-puj" style="color:#b88600">0</b> PUJ</span>
         <span class="ver" id="ver">v</span>
       </span>
@@ -560,6 +650,7 @@
     <footer>Actualizado: __UPDATED__ · actualización automática · análisis asistido por IA — fuentes
       citadas en cada nota</footer>
   </div>
+  <div class="toast" id="toast"></div>
 
   <script>
     const EVENTS = /*DATA*/;
@@ -580,7 +671,72 @@
     document.getElementById('s-break').textContent = EVENTS.filter(e => e.sev === 'crítico').length;
     document.getElementById('s-puj').textContent = EVENTS.filter(e => e.puj).length;
     document.getElementById('ver').textContent = '__UPDATED__'.split(' ').slice(0, 3).join(' ');
-    document.getElementById('today').textContent = new Date().toLocaleDateString('es-DO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    // ── Fecha (estilo "26 de junio del 2026") ──
+    const _MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    (function () { const n = new Date(); document.getElementById('today').textContent = `${n.getDate()} de ${_MESES[n.getMonth()]} del ${n.getFullYear()}`; })();
+
+    // ── Clima de Punta Cana en vivo (Open-Meteo, sin API key). Fallback silencioso si falla. ──
+    (function () {
+      const WMO = {
+        0: ['Despejado', '☀️'], 1: ['Mayormente despejado', '🌤️'], 2: ['Parcialmente nublado', '⛅'], 3: ['Nubes', '☁️'],
+        45: ['Niebla', '🌫️'], 48: ['Niebla', '🌫️'], 51: ['Llovizna', '🌦️'], 53: ['Llovizna', '🌦️'], 55: ['Llovizna', '🌦️'],
+        56: ['Llovizna', '🌧️'], 57: ['Llovizna', '🌧️'], 61: ['Lluvia', '🌧️'], 63: ['Lluvia', '🌧️'], 65: ['Lluvia fuerte', '🌧️'],
+        66: ['Lluvia', '🌧️'], 67: ['Lluvia', '🌧️'], 71: ['Nieve', '❄️'], 73: ['Nieve', '❄️'], 75: ['Nieve', '❄️'], 77: ['Nieve', '❄️'],
+        80: ['Chubascos', '🌦️'], 81: ['Chubascos', '🌧️'], 82: ['Aguaceros', '⛈️'], 95: ['Tormenta', '⛈️'], 96: ['Tormenta', '⛈️'], 99: ['Tormenta', '⛈️']
+      };
+      fetch('https://api.open-meteo.com/v1/forecast?latitude=18.567&longitude=-68.363&current=temperature_2m,weather_code&timezone=America/Santo_Domingo')
+        .then(r => r.json()).then(d => {
+          const c = Math.round(d.current.temperature_2m), f = Math.round(c * 9 / 5 + 32);
+          const [cond, ico] = WMO[d.current.weather_code] || ['Punta Cana', '✈️'];
+          document.getElementById('wx-temp').innerHTML = `<b>${c}°C</b> ${f}°F`;
+          document.getElementById('wx-ico').textContent = ico;
+          document.getElementById('wx-cond').textContent = cond;
+        }).catch(() => { });
+    })();
+
+    // ── Botón "Resumen → Mattermost": arma un resumen estructurado, lo copia y abre el servidor ──
+    const MM_URL = '__MM_URL__';
+    function toast(msg) {
+      const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show');
+      clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 3400);
+    }
+    function buildSummary() {
+      const n = new Date(), hh = String(n.getHours()).padStart(2, '0'), mm = String(n.getMinutes()).padStart(2, '0');
+      const fecha = `${n.getDate()} ${_MESES[n.getMonth()].slice(0, 3)} ${n.getFullYear()}, ${hh}:${mm}`;
+      const brk = EVENTS.filter(e => e.sev === 'crítico').length, puj = EVENTS.filter(e => e.puj).length;
+      const ico = s => s === 'crítico' ? '🔴' : s === 'importante' ? '🟠' : '🔵';
+      const L = [];
+      L.push(`✈️ **AeroIntel — Resumen aeronáutico** · ${fecha}`);
+      L.push(`📍 Hub PUJ · ${EVENTS.length} historias · 🔴 ${brk} última hora · ⭐ ${puj} relacionadas con PUJ`);
+      L.push('');
+      EVENTS.slice(0, 7).forEach(e => {
+        let why = String(e.why || '').replace(/\s+/g, ' ').trim();
+        if (why.length > 150) why = why.slice(0, 150) + '…';
+        L.push(`${ico(e.sev)} **[${catOf(e.cat).label}]** ${e.title}${e.puj ? ' · _PUJ_' : ''}`);
+        if (why) L.push(`> ${why}`);
+      });
+      L.push('');
+      L.push('_Generado por AeroIntel · vigilancia aeronáutica 24/7_');
+      return L.join('\n');
+    }
+    function fallbackCopy(text) {
+      const ta = document.createElement('textarea'); ta.value = text;
+      ta.style.position = 'fixed'; ta.style.top = '0'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      let ok = false; try { ok = document.execCommand('copy'); } catch (_) { }
+      document.body.removeChild(ta); return ok;
+    }
+    document.getElementById('mm-btn').addEventListener('click', () => {
+      const text = buildSummary();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text)
+          .then(() => toast('Resumen copiado ✓ — pégalo en Mattermost (Ctrl/Cmd+V)'))
+          .catch(() => toast(fallbackCopy(text) ? 'Resumen copiado ✓ — pégalo en Mattermost' : 'No se pudo copiar automáticamente'));
+      } else {
+        toast(fallbackCopy(text) ? 'Resumen copiado ✓ — pégalo en Mattermost' : 'No se pudo copiar automáticamente');
+      }
+      window.open(MM_URL, '_blank', 'noopener');   // misma activación de usuario → el navegador no lo bloquea
+    });
 
     // ticker: últimas/críticas (duplicado para loop continuo)
     (function () {
