@@ -27,7 +27,13 @@
 
     body {
       margin: 0;
-      background: var(--bg);
+      background-color: var(--bg);
+      /* textura sutil para las franjas laterales (no compite con el papel blanco encima) */
+      background-image:
+        radial-gradient(rgba(22, 40, 74, .055) 1px, transparent 1.4px),
+        radial-gradient(rgba(22, 40, 74, .04) 1px, transparent 1.4px);
+      background-size: 24px 24px, 24px 24px;
+      background-position: 0 0, 12px 12px;
       color: var(--ink);
       font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
     }
@@ -49,8 +55,9 @@
     .util {
       display: flex;
       align-items: center;
-      gap: 14px;
-      padding: 7px 22px;
+      flex-wrap: wrap;
+      gap: 8px 14px;
+      padding: 8px 22px;
       border-bottom: 1px solid var(--line);
       font-size: 12px;
       color: var(--muted);
@@ -64,8 +71,10 @@
     .util .right {
       margin-left: auto;
       display: flex;
-      gap: 16px;
+      flex-wrap: wrap;
+      gap: 10px 14px;
       align-items: center;
+      justify-content: flex-end;
     }
 
     .util .ver {
@@ -577,11 +586,19 @@
       flex-wrap: wrap;
     }
     .wx-date { font-weight: 600; color: var(--ink); }
+    .wx-clock {
+      font-family: ui-monospace, Menlo, monospace; font-weight: 700; font-size: 13px;
+      color: var(--navy); background: #eef1f7; border: 1px solid var(--line);
+      border-radius: 6px; padding: 2px 8px; letter-spacing: .5px;
+    }
+    .wx-clock .ampm { font-size: 9px; color: var(--muted); margin-left: 2px; }
     .wx-sep { color: var(--line); }
     .wx-pill {
-      display: inline-flex; align-items: center; gap: 8px;
+      display: inline-flex; align-items: center; flex-wrap: nowrap; gap: 8px; white-space: nowrap;
       background: #f0f4fa; border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px 3px 4px;
     }
+    .wx-cond { white-space: nowrap; }
+    .wx-wind, .wx-temp { white-space: nowrap; }
     .wx-loc {
       font-size: 10px; font-weight: 800; letter-spacing: .6px; color: #fff;
       background: var(--navy); border-radius: 999px; padding: 3px 8px;
@@ -590,6 +607,13 @@
     .wx-temp { color: var(--muted); font-size: 12px; display: inline-flex; align-items: baseline; gap: 4px; }
     .wx-temp b { color: var(--ink); font-weight: 800; font-size: 15px; }
     .wx-cond { color: var(--ink); font-weight: 600; }
+    .wx-wind {
+      display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted);
+      border-left: 1px solid var(--line); padding-left: 8px; font-weight: 600;
+    }
+    .wx-wind b { color: var(--ink); font-weight: 800; }
+    .wx-wind .arrow { display: inline-block; color: var(--navy2); font-size: 13px; line-height: 1; }
+    .wx-wind .rwy { color: var(--navy); font-weight: 800; cursor: help; }
 
     /* ── Indicador EN VIVO (estado de la automatización) ── */
     .live { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); font-weight: 600; white-space: nowrap; }
@@ -702,6 +726,8 @@
       .card .why { font-size: 13.5px; -webkit-line-clamp: 4; }
       .ticker a { font-size: 12px; }
       .stats { font-size: 11px; }
+      .wx-wind { display: none; }       /* el detalle de viento es un extra de escritorio */
+      .wx-pill { flex-wrap: wrap; white-space: normal; }
     }
 
     @media(max-width:380px) {
@@ -717,12 +743,14 @@
     <div class="util">
       <div class="wx">
         <span class="wx-date" id="today"></span>
+        <span class="wx-clock" id="clock" title="Hora local · República Dominicana (AST, UTC−4)">--:--:--</span>
         <span class="wx-sep">│</span>
         <span class="wx-pill" title="Condiciones actuales en el Aeropuerto Internacional de Punta Cana">
           <span class="wx-loc">PUJ</span>
           <span class="wx-ico" id="wx-ico">✈️</span>
           <span class="wx-temp" id="wx-temp">—</span>
           <span class="wx-cond" id="wx-cond">Punta Cana</span>
+          <span class="wx-wind" id="wx-wind" title="Viento — relevante para la pista en uso"></span>
         </span>
       </div>
       <span class="right">
@@ -759,7 +787,7 @@
 
     <footer>
       <div class="foot-own"><b>Gestión Operaciones Airside</b> · Aeropuerto Internacional de Punta Cana (PUJ)</div>
-      <div class="foot-meta">AeroIntel — inteligencia aeronáutica · Actualizado __UPDATED__ · actualización automática · análisis asistido por IA · fuentes citadas en cada nota</div>
+      <div class="foot-meta">AeroIntel — inteligencia aeronáutica · Actualizado <span id="foot-upd">—</span> (hora RD) · actualización automática · análisis asistido por IA · fuentes citadas en cada nota</div>
     </footer>
   </div>
   <div class="toast" id="toast"></div>
@@ -809,9 +837,31 @@
       box.classList.toggle('stale', h > 4);
     }
     setInterval(liveTick, 30000); liveTick();
-    // ── Fecha (estilo "26 de junio del 2026") ──
+    // ── Hora local de República Dominicana (AST, UTC−4) — forzada por zona horaria, no del navegador ──
     const _MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-    (function () { const n = new Date(); document.getElementById('today').textContent = `${n.getDate()} de ${_MESES[n.getMonth()]} del ${n.getFullYear()}`; })();
+    const RD_TZ = 'America/Santo_Domingo';
+    function rdParts(date) {
+      const f = new Intl.DateTimeFormat('en-US', {
+        timeZone: RD_TZ, year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+      });
+      const p = Object.fromEntries(f.formatToParts(date).map(x => [x.type, x.value]));
+      if (p.hour === '24') p.hour = '00';
+      return p;
+    }
+    // Reloj en vivo + fecha (se actualiza cada segundo)
+    function tickClock() {
+      const p = rdParts(new Date());
+      document.getElementById('clock').textContent = `${p.hour}:${p.minute}:${p.second}`;
+      document.getElementById('today').textContent = `${+p.day} de ${_MESES[+p.month - 1]} del ${p.year}`;
+    }
+    setInterval(tickClock, 1000); tickClock();
+    // Footer: hora de actualización en hora RD (BUILD_ISO viene en UTC)
+    (function () {
+      const p = rdParts(new Date(BUILD_ISO));
+      const el = document.getElementById('foot-upd');
+      if (el) el.textContent = `${+p.day} ${_MESES[+p.month - 1].slice(0, 3)} ${p.year}, ${p.hour}:${p.minute}`;
+    })();
 
     // ── Clima del aeropuerto PUJ en vivo (Open-Meteo, sin API key). Ícono y condición salen del
     //    MISMO código WMO → siempre coinciden. El ícono respeta día/noche para cielo despejado. ──
@@ -821,15 +871,17 @@
         0: ['Despejado', '☀️', '🌙'], 1: ['Mayormente despejado', '🌤️', '🌙'], 2: ['Parcialmente nublado', '⛅', '☁️'],
         3: ['Nublado', '☁️', '☁️'], 45: ['Niebla', '🌫️', '🌫️'], 48: ['Niebla', '🌫️', '🌫️'],
         51: ['Llovizna', '🌦️', '🌧️'], 53: ['Llovizna', '🌦️', '🌧️'], 55: ['Llovizna', '🌧️', '🌧️'],
-        56: ['Llovizna helada', '🌧️', '🌧️'], 57: ['Llovizna helada', '🌧️', '🌧️'],
+        56: ['Llovizna', '🌧️', '🌧️'], 57: ['Llovizna', '🌧️', '🌧️'],
         61: ['Lluvia', '🌧️', '🌧️'], 63: ['Lluvia', '🌧️', '🌧️'], 65: ['Lluvia fuerte', '🌧️', '🌧️'],
         66: ['Lluvia', '🌧️', '🌧️'], 67: ['Lluvia', '🌧️', '🌧️'],
         71: ['Nieve', '❄️', '❄️'], 73: ['Nieve', '❄️', '❄️'], 75: ['Nieve', '❄️', '❄️'], 77: ['Nieve', '❄️', '❄️'],
         80: ['Chubascos', '🌦️', '🌧️'], 81: ['Chubascos', '🌧️', '🌧️'], 82: ['Aguaceros', '⛈️', '⛈️'],
-        85: ['Chubascos de nieve', '🌨️', '🌨️'], 86: ['Chubascos de nieve', '🌨️', '🌨️'],
-        95: ['Tormenta', '⛈️', '⛈️'], 96: ['Tormenta con granizo', '⛈️', '⛈️'], 99: ['Tormenta con granizo', '⛈️', '⛈️']
+        85: ['Aguanieve', '🌨️', '🌨️'], 86: ['Aguanieve', '🌨️', '🌨️'],
+        95: ['Tormenta', '⛈️', '⛈️'], 96: ['Tormenta', '⛈️', '⛈️'], 99: ['Tormenta', '⛈️', '⛈️']
       };
-      fetch('https://api.open-meteo.com/v1/forecast?latitude=18.567&longitude=-68.363&current=temperature_2m,weather_code,is_day&timezone=America/Santo_Domingo')
+      const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'];
+      const compass = deg => COMPASS[Math.round(deg / 22.5) % 16];
+      fetch('https://api.open-meteo.com/v1/forecast?latitude=18.567&longitude=-68.363&current=temperature_2m,weather_code,is_day,wind_speed_10m,wind_direction_10m&timezone=America/Santo_Domingo')
         .then(r => r.json()).then(d => {
           const cur = d.current, c = Math.round(cur.temperature_2m), f = Math.round(c * 9 / 5 + 32);
           const w = WMO[cur.weather_code] || ['Nublado', '☁️', '☁️'];
@@ -837,6 +889,16 @@
           document.getElementById('wx-temp').innerHTML = `<b>${c}°C</b> ${f}°F`;
           document.getElementById('wx-ico').textContent = ico;
           document.getElementById('wx-cond').textContent = w[0];
+          if (cur.wind_speed_10m != null) {
+            const kt = Math.round(cur.wind_speed_10m * 0.539957), dir = cur.wind_direction_10m;
+            // Pista favorable en PUJ (RWY 08/26 ≈ 083°/263°): se opera contra el viento.
+            const angdist = (a, b) => { const x = Math.abs(a - b) % 360; return x > 180 ? 360 - x : x; };
+            const rwy = kt < 4 ? 'calmo' : (angdist(dir, 83) <= angdist(dir, 263) ? '08' : '26');
+            // flecha apunta a sotavento (hacia dónde va el viento = origen + 180°)
+            document.getElementById('wx-wind').innerHTML =
+              `<span class="arrow" style="transform:rotate(${(dir + 180) % 360}deg)">↑</span> Viento <b>${kt}</b> kt ${compass(dir)}` +
+              ` <span class="rwy" title="Pista favorable estimada por viento (PUJ 08/26). Referencial — no sustituye ATC/NOTAM.">· pista ${rwy}</span>`;
+          }
         }).catch(() => { });
     })();
 
@@ -846,9 +908,14 @@
       const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show');
       clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 3400);
     }
+    // Titular en el idioma traducido si la traducción está activa y disponible en caché.
+    const transTitle = e => {
+      const b = String(e.title).trim();
+      return (typeof transOn !== 'undefined' && transOn && _transCache.has(b)) ? _transCache.get(b) : e.title;
+    };
     function buildSummary() {
-      const n = new Date(), hh = String(n.getHours()).padStart(2, '0'), mm = String(n.getMinutes()).padStart(2, '0');
-      const fecha = `${n.getDate()} ${_MESES[n.getMonth()].slice(0, 3)} ${n.getFullYear()}, ${hh}:${mm}`;
+      const p = rdParts(new Date());
+      const fecha = `${+p.day} ${_MESES[+p.month - 1].slice(0, 3)} ${p.year}, ${p.hour}:${p.minute} (RD)`;
       const brk = EVENTS.filter(e => e.sev === 'crítico').length, puj = EVENTS.filter(e => e.puj).length;
       const tag = s => s === 'crítico' ? 'ÚLTIMA HORA' : s === 'importante' ? 'ACTUALIZACIÓN' : 'INFO';
       const L = [];
@@ -858,11 +925,11 @@
       EVENTS.slice(0, 7).forEach((e, i) => {
         let why = String(e.why || '').replace(/\s+/g, ' ').trim();
         if (why.length > 165) why = why.slice(0, 165) + '…';
-        L.push(`**${i + 1}. [${catOf(e.cat).label} · ${tag(e.sev)}${e.puj ? ' · PUJ' : ''}]** ${e.title}`);
+        L.push(`**${i + 1}. [${catOf(e.cat).label} · ${tag(e.sev)}${e.puj ? ' · PUJ' : ''}]** ${transTitle(e)}`);
         if (why) L.push(`> ${why}`);
         L.push('');
       });
-      L.push('— Generado por AeroIntel · vigilancia aeronáutica 24/7');
+      L.push('— Generado por AeroIntel · Gestión Operaciones Airside · vigilancia aeronáutica 24/7');
       return L.join('\n');
     }
     function fallbackCopy(text) {
@@ -1081,11 +1148,21 @@
         } catch (e) { }
       }
     }
+    // Precalienta el caché con los titulares del top (para el resumen de Mattermost, aunque no
+    // estén en la vista actual).
+    async function warmTitles() {
+      const tr = await getTranslator(); if (!tr) return;
+      for (const e of EVENTS.slice(0, 8)) {
+        const b = String(e.title).trim();
+        if (looksEnglish(b) && !_transCache.has(b)) { try { _transCache.set(b, await tr.translate(b)); } catch (_) { } }
+      }
+    }
     transBtn.addEventListener('click', async () => {
       transOn = !transOn;
       transBtn.classList.toggle('on', transOn);
       transBtn.textContent = transOn ? '🌐 Original' : '🌐 Traducir';
       await applyTranslation(transOn);
+      if (transOn) warmTitles();
     });
 
     render();
