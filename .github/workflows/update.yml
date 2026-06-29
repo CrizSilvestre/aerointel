@@ -4,9 +4,9 @@ name: AeroIntel update
 # GitHub Pages (y publica lo crítico a Mattermost si está configurado).
 on:
   schedule:
-    # Cada 15 min. El cron de GitHub se retrasa/salta bajo carga, así que programar más
-    # seguido da más corridas efectivas → frescura real. Repo público = minutos gratis.
-    - cron: "*/15 * * * *"
+    # Cada 30 min: equilibra frescura (GitHub a veces salta corridas) con el presupuesto del
+    # free tier de Groq. Repo público = minutos de Actions gratis.
+    - cron: "*/30 * * * *"
   workflow_dispatch: {}          # permite correrlo a mano desde Actions
 
 permissions:
@@ -36,8 +36,11 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           MATTERMOST_WEBHOOK_URL: ${{ secrets.MATTERMOST_WEBHOOK_URL }}
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}   # SkyLink NOTAM API (opcional; sin él, sin sección NOTAM)
-          AEROINTEL_LLM_MAX: "18"
-          AEROINTEL_LLM_SLEEP: "2.5"        # prompt analista más largo → ritmo suave para el free tier
+          # Presupuesto de IA por corrida acotado al free tier de Groq (cron 30 min). Lo no analizado
+          # por IA usa lectura/heurística. Si la cuota diaria se agota, cae a heurística (sin romperse).
+          AEROINTEL_LLM_MAX: "10"           # noticias top que reescribe el analista IA
+          AEROINTEL_NOTAM_LLM_MAX: "10"     # NOTAMs top que interpreta la IA
+          AEROINTEL_LLM_SLEEP: "2.0"        # ritmo entre llamadas (respeta rate limits)
           AEROINTEL_IMG_N: "48"
         run: |
           python3 tests/test_pipeline.py     # los tests deben pasar antes de publicar

@@ -944,7 +944,8 @@ def main():
         print(f"  NOTAM ({notams.ICAO_DEFAULT}): {len(notam_list)} activos ({alta} de alta importancia)")
         # Lectura operativa con IA (si hay proveedor LLM); si no, queda la heurística.
         if notam_list and prov:
-            done = interpret_notams_llm(notam_list, prov)
+            notam_cap = int(os.environ.get("AEROINTEL_NOTAM_LLM_MAX", "14"))
+            done = interpret_notams_llm(notam_list, prov, cap=notam_cap)
             if done:
                 print(f"  NOTAM · IA interpretó {done}/{len(notam_list)} (resto: lectura heurística)")
 
