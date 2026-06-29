@@ -238,7 +238,10 @@ KW = {
     "rutas":       ["new route", "new service", "launches", "primer vuelo", "vuelo entre", "nueva ruta",
                     "frequency", "nonstop", "nueva frecuencia", "inaugura", "conecta", "begins flights", "resumes service"],
     "meteo":       ["hurricane", "tropical storm", "tropical depression", "fog", "turbulence", "blizzard",
-                    "tormenta tropical", "huracán", "ciclón", "depresión tropical", "onamet", "nhc"],
+                    "tormenta tropical", "huracán", "ciclón", "depresión tropical", "onamet", "nhc",
+                    "vaguada", "inundaci", "alerta meteorol", "alerta verde", "alerta amarilla",
+                    "alerta roja", "marejada", "oleaje", "frente frío", "frente frio", "aguacero",
+                    "granizo", "tornado", "flooding", "thunderstorm"],
     "seguridad":   ["crash", "accident", "incident", "emergency", "mayday", "evacuat", "fire", "smoke", "aog",
                     "close call", "near miss", "near-miss", "go-around", "go around", "loss of separation",
                     "tcas", "bird strike", "hard landing", "tail strike", "runway excursion", "rejected takeoff",
@@ -313,7 +316,7 @@ def detect_airlines(text):
 DR_CORE = ["punta cana", "puj", "santo domingo", "sdq", " sti ", "santiago de los caballeros",
            "puerto plata", " pop ", "la romana", " lrm ", "samaná", "el catey", " azs ",
            "república dominicana", "republica dominicana", "dominican republic", "aerodom",
-           "idac", "junta de aviación civil", "jac", "arajet", "sky high"]
+           "idac", "junta de aviación civil", "jac", "arajet", "sky high", "onamet"]
 # Anillo regional/Caribe: relevante por proximidad y rutas, pero menor peso que el núcleo RD.
 DR_REGIONAL = ["dominican", "caribbean", "caribe", "puerto rico", "san juan sju", "cuba", "haiti",
                "haití", "jamaica", "bahamas", "antilles", "antillas", "hispaniola"]
@@ -321,6 +324,17 @@ DR_TERMS = DR_CORE + DR_REGIONAL  # compat: is_dr/is_relevant siguen viendo todo
 WX_REGION = ["caribbean", "caribe", "atlantic", "atlántico", "dominican", "punta cana", "cuba",
              "jamaica", "bahamas", "hispaniola", "haiti", "haití", "puerto rico", "antilles", "antillas"]
 WX_TROPICAL = ["tropical storm", "tropical depression", "hurricane", "huracán", "ciclón", "tormenta tropical"]
+# Clima que afecta al PAÍS = afecta la operación de PUJ (aunque la nota no diga "avión"). Amplio
+# pero acotado: solo cuenta junto a una ubicación RD/Caribe (ver is_relevant).
+# OJO: nada de términos ambiguos como "temporal" (es. temporary) — generan falsos positivos.
+WX_TERMS = WX_TROPICAL + [
+    "lluvia", "aguacero", "vaguada", "inundaci", "onamet", "alerta meteorol", "alerta verde",
+    "alerta amarilla", "alerta roja", "marejada", "oleaje", "frente frío", "frente frio",
+    "ola de calor", "tormenta eléctrica", "tormenta electrica", "granizo", "tornado",
+    "neblina", "niebla", "mal tiempo", "viento fuerte", "ráfaga", "rafaga", "rain", "rainfall",
+    "storm", "thunderstorm", "flooding", "flood", "fog", "gale", "squall", "downpour"]
+# Filtro de clima con LÍMITE DE PALABRA (no subcadena) → evita fugas tipo 'temporal' en 'temporalmente'.
+WX_RE = word_re(WX_TERMS)
 # Ruido turístico/marketing sin valor operacional → se castiga fuerte y se filtra.
 NOISE_RE = re.compile(
     r"\b(best time to (?:book|visit)|how to (?:book|find|score|visit|travel|get to)|"
@@ -353,7 +367,8 @@ def is_relevant(text):
         return True
     if any(c in tl for c in DR_AIRPORT_CODES):       # códigos IATA de aeropuertos RD = contexto aviación
         return True
-    if any(k in tl for k in WX_TROPICAL) and any(r in tl for r in WX_REGION):
+    # Clima que afecta a RD/Caribe entra como meteo (afecta operaciones de PUJ aunque no diga "avión").
+    if WX_RE.search(t) and dr_tier(t) is not None:
         return True
     return False
 

@@ -12,7 +12,9 @@
     { "name": "Google News · Seguridad/incidentes (EN)", "type": "gnews", "lang": "en-US", "gl": "US",
       "query": "aviation incident OR \"emergency landing\" OR \"aircraft\" diverted OR \"runway\" OR \"engine failure\"" },
     { "name": "Google News · Meteo Caribe (EN)", "type": "gnews", "lang": "en-US", "gl": "US",
-      "query": "hurricane Caribbean OR \"tropical storm\" Caribbean OR \"Dominican Republic\" flights OR Caribbean airport weather disruption" }
+      "query": "hurricane Caribbean OR \"tropical storm\" Caribbean OR \"Dominican Republic\" flights OR Caribbean airport weather disruption" },
+    { "name": "Google News · Meteo RD (ES)", "type": "gnews", "lang": "es-419", "gl": "DO",
+      "query": "\"República Dominicana\" tiempo OR lluvias OR vaguada OR ONAMET OR inundaciones OR aguaceros OR \"alerta meteorológica\" OR \"mal tiempo\"" }
   ],
   "_fuentes_oficiales_para_sumar": [
     "NHC Atlántico (ciclones): https://www.nhc.gov/index-at.xml",

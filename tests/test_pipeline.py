@@ -25,6 +25,11 @@ ok("relevante · ciclón en el Caribe sí", A.is_relevant("Hurricane approaches 
 ok("relevante · RD sí", A.is_relevant("El aeropuerto de Punta Cana amplía operaciones"))
 ok("relevante · 'jet' en 'objetivo' NO es aviación", not A.is_relevant("El Gobierno tiene como objetivo elevar la inversión en fertilizantes"))
 ok("relevante · 'faa' en 'rafaela' NO es aviación", not A.is_relevant("La empresa Rafaela anunció nuevos empleos"))
+# Flexibilidad meteo: clima que afecta a RD entra (afecta ops de PUJ); ambiguos/EEUU no.
+ok("relevante · vaguada en RD entra", A.is_relevant("Vaguada provoca aguaceros en República Dominicana"))
+ok("relevante · ONAMET alerta entra", A.is_relevant("ONAMET emite alerta amarilla para varias provincias"))
+ok("relevante · 'temporal' ambiguo NO cuela economía", not A.is_relevant("Serie temporal de exportaciones de la República Dominicana"))
+ok("relevante · clima EEUU sin RD NO entra", not A.is_relevant("Heavy rain and storm forecast across Montana"))
 ok("ruido · 'how to book' turismo", bool(A.NOISE_RE.search("How To Book The Caribbean During Hurricane Season")))
 
 # ── Limpieza de titulares crudos de Google News ──
