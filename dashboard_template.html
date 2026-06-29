@@ -1286,8 +1286,13 @@
     .notam-card .nsched { font-size: 11.5px; color: var(--muted); margin-bottom: 6px; }
     .notam-card .nsched b { color: var(--ink); }
     /* Lectura legible = contenido principal; el texto crudo se colapsa (ver más abajo). */
-    .notam-card .nread { font-size: 13px; line-height: 1.5; color: var(--ink); margin: 2px 0 8px; }
-    .notam-card .nread .ia { font-size: 9px; font-weight: 800; letter-spacing: .4px; color: #fff; background: var(--navy2); border-radius: 3px; padding: 1px 5px; margin-left: 5px; vertical-align: middle; }
+    /* Altura fija (3 líneas) → todas las tarjetas iguales y los pies alineados. */
+    .notam-card .nread {
+      font-size: 13px; line-height: 1.5; color: var(--ink); margin: 2px 0 8px;
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+      min-height: 4.5em;
+    }
+    .notam-card .nia { font-size: 9px; font-weight: 800; letter-spacing: .4px; color: #fff; background: var(--navy2); border-radius: 3px; padding: 1px 5px; }
     .notam-card .nfoot { font-size: 10.5px; color: var(--muted); margin-top: 9px; }
     /* texto original del NOTAM: colapsado por defecto, sin dominar la tarjeta */
     .notam-card .nraw { margin-top: 2px; }
@@ -1742,10 +1747,11 @@
           <span class="nid">${esc(n.id)}</span>
           <span class="nsub">${esc(n.subject)}</span>
           <span class="nstat ${n.status}">${statusES}</span>
+          ${n.lectura_ia ? '<span class="nia">IA</span>' : ''}
           ${imp ? '<span class="nhigh">Alta</span>' : ''}
         </div>
         <div class="nsched">Vigencia: <b>${sched}</b> (hora RD)${n.tipo ? ` · ${esc(n.tipo)}` : ''}</div>
-        ${n.lectura ? `<div class="nread">${esc(n.lectura)}${n.lectura_ia ? '<span class="ia">IA</span>' : ''}</div>` : ''}
+        ${n.lectura ? `<div class="nread">${esc(n.lectura)}</div>` : ''}
         <details class="nraw"><summary>Texto original del NOTAM</summary><pre>${esc(n.raw || n.body)}</pre></details>
         ${n.source ? `<div class="nfoot">Fuente: ${esc(n.source)}</div>` : ''}
       </article>`;

@@ -757,9 +757,9 @@ def analyze(text, n_sources):
 # ── Interpretación de NOTAMs con IA (texto llano). Reusa el proveedor LLM; respaldo heurístico. ──
 NOTAM_SYS = (
     "Eres especialista en operaciones airside del Aeropuerto Internacional de Punta Cana (PUJ/MDPC). "
-    "Explica el NOTAM en español claro y OPERATIVO, en 1-2 frases: qué significa en lenguaje llano y la "
-    "implicación concreta para la operación (pista, rodaje, plataforma, navegación, seguridad). NUNCA "
-    "inventes datos que no estén en el texto. Conciso y profesional, sin emojis, sin repetir el código crudo.")
+    "Explica el NOTAM en español claro y OPERATIVO en UNA sola frase breve (máx ~30 palabras): qué "
+    "significa y su implicación concreta para la operación. NUNCA inventes datos que no estén en el texto. "
+    "Directo y profesional, sin emojis, sin repetir el código crudo, sin frases de relleno.")
 
 def llm_complete(system, user, prov, max_tokens=220):
     try:
@@ -786,9 +786,13 @@ def llm_complete(system, user, prov, max_tokens=220):
 def interpret_notams_llm(notam_list, prov, cap=14, pause=0.8):
     done = 0
     for n in notam_list[:cap]:
-        txt = llm_complete(NOTAM_SYS, n.get("raw") or n.get("body") or "", prov)
+        txt = llm_complete(NOTAM_SYS, n.get("raw") or n.get("body") or "", prov, max_tokens=110)
         if not txt:
             break                       # rate-limit/fallo → conservar la lectura heurística para el resto
+        # tope duro por si el modelo se extiende: ~1-2 frases, evita tarjetas disparejas
+        if len(txt) > 260:
+            cut = txt[:260].rsplit(" ", 1)[0]
+            txt = cut.rstrip(" ,;:.") + "…"
         n["lectura"], n["lectura_ia"] = txt, True
         done += 1
         time.sleep(pause)
