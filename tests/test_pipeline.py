@@ -110,5 +110,18 @@ ok("api · latest tiene items", latest["count"] == 2 and bool(latest["items"][0]
 ok("api · analytics.json existe", os.path.exists(os.path.join(tmp, "api/analytics.json")))
 conn.close()
 
+# ── NOTAMs: clasificación de sujeto/importancia/estado (sin red) ──
+import notams as NT
+nd = NT.normalize({"notam_id": "A1/26", "type": "N", "location": "MDPC",
+                   "effective": "2026-06-01T00:00:00Z", "expiration": "2027-01-01T00:00:00Z",
+                   "body": "RWY 08/26 CLSD", "raw": "RWY 08/26 CLSD", "source": "AIS"})
+ok("notam · RWY CLSD = Pista", nd["subject"] == "Pista")
+ok("notam · RWY CLSD = alta importancia", nd["importance"] == "alta")
+ok("notam · vigente (fechas)", nd["status"] == "vigente")
+ok("notam · ILS GP U/S = navegación/alta", NT.classify("ILS RWY 08 GP U/S") == ("Ayuda a navegación", "alta"))
+ok("notam · crane iluminado = Obstáculo (no Iluminación)", NT.classify("OBST CRANE 145FT MARKED AND LGT")[0] == "Obstáculo")
+ok("notam · TWY WIP = Calle de rodaje/media", NT.classify("TWY C WIP") == ("Calle de rodaje", "media"))
+ok("notam · expirado se detecta", NT.normalize({"expiration": "2020-01-01T00:00:00Z", "raw": "x"})["status"] == "expirado")
+
 print(f"\n{'ALL PASS' if not fails else str(fails) + ' FAILED'}")
 sys.exit(1 if fails else 0)

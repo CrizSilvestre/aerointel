@@ -35,6 +35,7 @@ jobs:
           AEROINTEL_LLM: groq
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           MATTERMOST_WEBHOOK_URL: ${{ secrets.MATTERMOST_WEBHOOK_URL }}
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}   # SkyLink NOTAM API (opcional; sin él, sin sección NOTAM)
           AEROINTEL_LLM_MAX: "18"
           AEROINTEL_LLM_SLEEP: "2.5"        # prompt analista más largo → ritmo suave para el free tier
           AEROINTEL_IMG_N: "48"

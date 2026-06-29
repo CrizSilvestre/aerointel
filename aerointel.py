@@ -12,7 +12,7 @@ from difflib import SequenceMatcher
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import Counter
-import store, apiexport
+import store, apiexport, notams
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "output")
@@ -795,7 +795,7 @@ def entity_chips(analysis):
             out.append(c)
     return out[:3]
 
-def write_dashboard(events):
+def write_dashboard(events, notam_list=None):
     tpl_path = os.path.join(HERE, "dashboard_template.html")
     if not os.path.exists(tpl_path):
         return
@@ -812,6 +812,7 @@ def write_dashboard(events):
     build_iso = datetime.utcnow().isoformat(timespec="seconds") + "Z"   # hora de generación (UTC)
     out = (open(tpl_path, encoding="utf-8").read()
            .replace("/*DATA*/", json.dumps(data, ensure_ascii=False))
+           .replace("/*NOTAMS*/", json.dumps(notam_list or [], ensure_ascii=False))
            .replace("__UPDATED__", f"{datetime.now():%d %b %Y %H:%M}")
            .replace("__BUILD_ISO__", build_iso)
            .replace("__MM_URL__", mm_url))
@@ -879,11 +880,19 @@ def main():
     if os.environ.get("AEROINTEL_NO_IMG", "").lower() not in ("1", "true", "yes"):
         fetch_images_parallel(events, n=n_img)
 
+    # 4b) NOTAMs activos de la estación (MDPC). Server-side; sin clave/sin suscripción → [] y se omite.
+    notam_list, notam_err = notams.fetch_notams()
+    if notam_err:
+        print(f"  NOTAM ({notams.ICAO_DEFAULT}): omitido — {notam_err}")
+    else:
+        alta = sum(1 for n in notam_list if n["importance"] == "alta")
+        print(f"  NOTAM ({notams.ICAO_DEFAULT}): {len(notam_list)} activos ({alta} de alta importancia)")
+
     json.dump([to_mattermost(ev) for ev in events],
               open(os.path.join(OUT, "mattermost_payloads.json"), "w", encoding="utf-8"),
               ensure_ascii=False, indent=2)
     write_briefing(events)
-    write_dashboard(events)
+    write_dashboard(events, notam_list)
 
     # 5) persistencia (SQLite) + API estática JSON. Aislado en try: nunca debe tumbar la corrida.
     breaking_n = sum(1 for ev in events if ev["analysis"]["severidad"] in ("crítico", "importante"))
@@ -894,6 +903,9 @@ def main():
         store.record_run(conn, before, len(events), breaking_n, with_img, bool(prov))
         apiexport.write_api(events, OUT, SOURCES, store.analytics(conn), human_age)
         conn.close()
+        json.dump({"icao": notams.ICAO_DEFAULT, "count": len(notam_list), "notams": notam_list},
+                  open(os.path.join(OUT, "api", "notams.json"), "w", encoding="utf-8"),
+                  ensure_ascii=False, indent=2)
         print(f"  → SQLite: {os.path.basename(store.DB_PATH)} · API estática: output/api/news/latest.json")
     except Exception as e:
         print(f"  ⚠ persistencia/API omitida ({type(e).__name__}: {e})")

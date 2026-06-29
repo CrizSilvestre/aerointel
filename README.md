@@ -131,6 +131,26 @@ Ver `.env.example`. Las más relevantes:
 `GET /api/news/latest?limit=&category=&puj=&min_impact=` · `/api/news/categories` ·
 `/api/news/sources` · `/api/analytics` · `/docs` (OpenAPI).
 
+`/api/notams.json` — NOTAMs activos de la estación (si está configurado).
+
+---
+
+## NOTAMs de la estación (categoría operativa)
+
+Sección **NOTAM** con los avisos a la navegación aérea **vigentes y programados** de la estación
+(**MDPC** = Punta Cana), vía **SkyLink API** (RapidAPI). `notams.py` los clasifica por **sujeto
+operativo** (Pista, Calle de rodaje, Plataforma, Ayuda a navegación, Iluminación, Obstáculo,
+Actividad UAS/drones, Fauna…), marca **importancia alta** (cierres de pista/aeródromo, ayudas
+críticas U/S) y **estado** (vigente/programado), con la vigencia en **hora local RD**.
+
+- La clave (`RAPIDAPI_KEY`) es **server-side**: se usa en el pipeline / GitHub Actions y **nunca**
+  llega al navegador ni se commitea. Sin clave/suscripción, la sección simplemente **no aparece**.
+- `AEROINTEL_NOTAM_DEMO=1` muestra NOTAMs de ejemplo para previsualizar la categoría.
+- Referencial/operativo — la **fuente oficial es AIS/IDAC**.
+
+> Endpoint real usado: `GET https://skylink-api.p.rapidapi.com/notams/{ICAO}` (fechas en formato
+> NOTAM `YYYYMMDDHHMM` / `PERM`; el código las normaliza).
+
 ---
 
 ## Automatización / despliegue (24/7)
