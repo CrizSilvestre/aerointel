@@ -739,6 +739,46 @@ def analyze(text, n_sources):
             print(f"   (LLM falló, uso heurística: {e})")
     return analyze_heuristic(text, n_sources)
 
+# ── Interpretación de NOTAMs con IA (texto llano). Reusa el proveedor LLM; respaldo heurístico. ──
+NOTAM_SYS = (
+    "Eres especialista en operaciones airside del Aeropuerto Internacional de Punta Cana (PUJ/MDPC). "
+    "Explica el NOTAM en español claro y OPERATIVO, en 1-2 frases: qué significa en lenguaje llano y la "
+    "implicación concreta para la operación (pista, rodaje, plataforma, navegación, seguridad). NUNCA "
+    "inventes datos que no estén en el texto. Conciso y profesional, sin emojis, sin repetir el código crudo.")
+
+def llm_complete(system, user, prov, max_tokens=220):
+    try:
+        if prov == "anthropic":
+            key = os.environ["ANTHROPIC_API_KEY"]
+            model = os.environ.get("AEROINTEL_MODEL", "claude-haiku-4-5-20251001")
+            payload = {"model": model, "max_tokens": max_tokens, "system": system,
+                       "messages": [{"role": "user", "content": user[:1500]}]}
+            req = urllib.request.Request("https://api.anthropic.com/v1/messages", data=json.dumps(payload).encode(),
+                headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json", "User-Agent": UA})
+            return json.loads(urllib.request.urlopen(req, timeout=40).read())["content"][0]["text"].strip()
+        if prov in OPENAI_PROVIDERS:
+            base, default_model, key_env = OPENAI_PROVIDERS[prov]
+            key = os.environ.get(key_env) or os.environ.get("LLM_API_KEY", "")
+            model = os.environ.get("AEROINTEL_MODEL", default_model)
+            payload = {"model": model, "max_tokens": max_tokens, "temperature": 0.2,
+                       "messages": [{"role": "system", "content": system}, {"role": "user", "content": user[:1500]}]}
+            req = urllib.request.Request(base, data=json.dumps(payload).encode(),
+                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json", "User-Agent": UA})
+            return json.loads(urllib.request.urlopen(req, timeout=40).read())["choices"][0]["message"]["content"].strip()
+    except Exception:
+        return None
+
+def interpret_notams_llm(notam_list, prov, cap=14, pause=0.8):
+    done = 0
+    for n in notam_list[:cap]:
+        txt = llm_complete(NOTAM_SYS, n.get("raw") or n.get("body") or "", prov)
+        if not txt:
+            break                       # rate-limit/fallo → conservar la lectura heurística para el resto
+        n["lectura"], n["lectura_ia"] = txt, True
+        done += 1
+        time.sleep(pause)
+    return done
+
 # ───────────────────────── salida (Mattermost / briefing) ─────────────────────────
 COLOR = {"crítico": "#c00000", "importante": "#e69100", "info": "#1F3864"}
 EMOJI = {"crítico": "🔴", "importante": "🟠", "info": "🔵"}
@@ -887,6 +927,11 @@ def main():
     else:
         alta = sum(1 for n in notam_list if n["importance"] == "alta")
         print(f"  NOTAM ({notams.ICAO_DEFAULT}): {len(notam_list)} activos ({alta} de alta importancia)")
+        # Lectura operativa con IA (si hay proveedor LLM); si no, queda la heurística.
+        if notam_list and prov:
+            done = interpret_notams_llm(notam_list, prov)
+            if done:
+                print(f"  NOTAM · IA interpretó {done}/{len(notam_list)} (resto: lectura heurística)")
 
     json.dump([to_mattermost(ev) for ev in events],
               open(os.path.join(OUT, "mattermost_payloads.json"), "w", encoding="utf-8"),

@@ -122,6 +122,9 @@ ok("notam · ILS GP U/S = navegación/alta", NT.classify("ILS RWY 08 GP U/S") ==
 ok("notam · crane iluminado = Obstáculo (no Iluminación)", NT.classify("OBST CRANE 145FT MARKED AND LGT")[0] == "Obstáculo")
 ok("notam · TWY WIP = Calle de rodaje/media", NT.classify("TWY C WIP") == ("Calle de rodaje", "media"))
 ok("notam · expirado se detecta", NT.normalize({"expiration": "2020-01-01T00:00:00Z", "raw": "x"})["status"] == "expirado")
+ok("notam · lectura operativa no vacía", len(nd["lectura"]) > 20)
+ok("notam · lectura de RWY CLSD menciona pista", "pista" in NT.interpret_heuristic({"subject": "Pista", "body": "RWY 08/26 CLSD"}).lower())
+ok("notam · lectura ILS U/S menciona servicio", "servicio" in NT.interpret_heuristic({"subject": "Ayuda a navegación", "body": "ILS RWY 08 GP U/S"}).lower())
 
 print(f"\n{'ALL PASS' if not fails else str(fails) + ' FAILED'}")
 sys.exit(1 if fails else 0)

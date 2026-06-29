@@ -74,6 +74,59 @@ def classify(text):
 _TYPE_ES = {"N": "Nuevo", "R": "Reemplazo", "C": "Cancelación"}
 
 
+# ── Lectura operativa (heurística): traduce el NOTAM críptico a español llano + implicación. ──
+_RWY_RE = re.compile(r"\bRWY\s*([0-9]{2}[LRC]?(?:\s*/\s*[0-9]{2}[LRC]?)?)", re.I)
+_TWY_RE = re.compile(r"\bTWY\s*([A-Z][0-9]{0,2})", re.I)
+_STAND_RE = re.compile(r"\bSTANDS?\s+([A-Z]?\d+[A-Z]?(?:[\s,]+(?:AND\s+)?[A-Z]?\d+[A-Z]?){0,6})", re.I)
+
+def interpret_heuristic(n):
+    t = (n.get("body") or n.get("raw") or "").upper()
+    subj = n.get("subject", "General")
+    closed = bool(re.search(r"\bCLSD\b|CLOSED|WITHDRAWN", t))
+    wip = bool(re.search(r"\bWIP\b|WORK IN PROGRESS", t))
+    new = bool(re.search(r"\bNEW\b|\bINSTALLED\b|\bINSTL\b|RELOCATED", t))
+    rwy, twy, st = _RWY_RE.search(t), _TWY_RE.search(t), _STAND_RE.search(t)
+    R = (rwy.group(1).replace(" ", "") if rwy else "")
+    if subj == "Pista":
+        p = f"Pista {R}" if rwy else "Pista"
+        if closed:
+            return f"{p} cerrada. No disponible para despegues/aterrizajes en el período indicado; prever demoras o uso de pista alterna."
+        if wip:
+            return f"{p} con trabajos en curso. Posibles restricciones; confirmar disponibilidad antes de operar."
+        return f"Aviso sobre {p.lower()}. Revisar su efecto en las operaciones de pista."
+    if subj == "Calle de rodaje":
+        c = f"calle de rodaje {twy.group(1)}" if twy else "una calle de rodaje"
+        if closed:
+            return f"Cierre de {c}. Ajustar el rodaje en tierra; posibles mayores tiempos de taxi."
+        if wip:
+            return f"Trabajos en {c}. Rodaje restringido; coordinar ruta alterna."
+        if new:
+            return f"Nueva configuración en {c}. Actualizar cartografía y planificación de rodaje."
+        return f"Aviso sobre {c}. Revisar su efecto en el rodaje."
+    if subj == "Plataforma":
+        ids = st.group(1).strip().replace(" AND ", ", ") if st else ""
+        base = (f"Posiciones de estacionamiento {ids}" if ids else "Posiciones de estacionamiento")
+        if closed:
+            return f"{base} fuera de uso. Afecta la asignación de puestos y el remolque; coordinar con plataforma."
+        if new:
+            return f"{base}: nueva configuración o instalación. Actualizar la asignación de puestos."
+        return f"Aviso de plataforma sobre {base.lower()}. Revisar la asignación de puestos."
+    if subj == "Ayuda a navegación":
+        sysn = "el ILS" if re.search(r"\bILS\b|\bGP\b|\bLOC\b", t) else ("el GBAS" if "GBAS" in t else "una ayuda a la navegación")
+        where = f" de la pista {R}" if rwy else ""
+        sysn = sysn[0].upper() + sysn[1:]     # primera letra mayúscula sin tocar el acrónimo (GBAS/ILS)
+        return f"{sysn}{where} fuera de servicio. Aproximaciones de precisión o el uso de ese sistema no disponibles; prever procedimientos alternos."
+    if subj == "Iluminación":
+        return "Sistema de iluminación afectado. Reduce las ayudas visuales; relevante en baja visibilidad u operación nocturna."
+    if subj == "Obstáculo":
+        return "Obstáculo (p. ej. grúa) reportado en las cercanías. Relevante para procedimientos de aproximación/salida y márgenes; verificar señalización e iluminación."
+    if subj == "Actividad UAS/drones":
+        return "Actividad de drones/UAS en el área. Riesgo para aproximación y salida; mantener vigilancia y coordinación."
+    if subj == "Fauna":
+        return "Actividad de fauna (aves) en la vecindad del aeródromo. Riesgo de impacto; precaución en aproximación y despegue."
+    return "Aviso operativo de la estación. Revisar el texto del NOTAM para determinar su efecto en la operación."
+
+
 def normalize(n, now=None):
     now = now or datetime.now(timezone.utc)
     eff, exp = _parse_dt(n.get("effective")), _parse_dt(n.get("expiration"))
@@ -99,6 +152,9 @@ def normalize(n, now=None):
         "permanent": permanent,
         "body": body or raw,
         "raw": raw,
+        # Lectura operativa (heurística por defecto; la IA la mejora en el pipeline si hay LLM).
+        "lectura": interpret_heuristic({"body": body, "raw": raw, "subject": subject}),
+        "lectura_ia": False,
         # SkyLink no trae 'source'; usamos el alcance (scope) traducido como etiqueta de origen.
         "source": n.get("source") or _scope_es(n.get("scope")),
     }
