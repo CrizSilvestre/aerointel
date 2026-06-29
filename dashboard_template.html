@@ -1285,14 +1285,15 @@
     .notam-card .nhigh { font-size: 9.5px; font-weight: 800; background: var(--crit); color: #fff; border-radius: 3px; padding: 2px 6px; letter-spacing: .4px; margin-left: auto; }
     .notam-card .nsched { font-size: 11.5px; color: var(--muted); margin-bottom: 6px; }
     .notam-card .nsched b { color: var(--ink); }
-    .notam-card .nbody { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 1.5; color: var(--ink); white-space: pre-wrap; word-break: break-word; }
-    .notam-card .nbody.clamp { max-height: 7.6em; overflow: hidden; -webkit-mask-image: linear-gradient(#000 72%, transparent); mask-image: linear-gradient(#000 72%, transparent); }
-    .notam-card .nmore { margin-top: 6px; border: 0; background: none; color: var(--navy2); font: inherit; font-weight: 700; font-size: 11px; cursor: pointer; padding: 0; }
-    .notam-card .nmore:hover { text-decoration: underline; }
-    .notam-card .nfoot { font-size: 10.5px; color: var(--muted); margin-top: 7px; }
-    .notam-card .ninterp { margin-top: 9px; font-size: 12.5px; line-height: 1.45; color: #33405c; background: #f5f7fb; border-left: 3px solid var(--navy); padding: 8px 11px; border-radius: 0 5px 5px 0; }
-    .notam-card .ninterp b { color: var(--navy); }
-    .notam-card .ninterp .ia { font-size: 9px; font-weight: 800; letter-spacing: .4px; color: #fff; background: var(--navy2); border-radius: 3px; padding: 1px 5px; margin-left: 4px; vertical-align: middle; }
+    /* Lectura legible = contenido principal; el texto crudo se colapsa (ver más abajo). */
+    .notam-card .nread { font-size: 13px; line-height: 1.5; color: var(--ink); margin: 2px 0 8px; }
+    .notam-card .nread .ia { font-size: 9px; font-weight: 800; letter-spacing: .4px; color: #fff; background: var(--navy2); border-radius: 3px; padding: 1px 5px; margin-left: 5px; vertical-align: middle; }
+    .notam-card .nfoot { font-size: 10.5px; color: var(--muted); margin-top: 9px; }
+    /* texto original del NOTAM: colapsado por defecto, sin dominar la tarjeta */
+    .notam-card .nraw { margin-top: 2px; }
+    .notam-card .nraw summary { font-size: 11px; font-weight: 700; color: var(--navy2); cursor: pointer; }
+    .notam-card .nraw summary:hover { text-decoration: underline; }
+    .notam-card .nraw pre { font-family: ui-monospace, Menlo, monospace; font-size: 11px; line-height: 1.45; color: var(--muted); white-space: pre-wrap; word-break: break-word; background: #f6f8fc; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin: 7px 0 0; max-height: 200px; overflow: auto; }
     @media(max-width:600px) { .notam-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -1736,7 +1737,6 @@
       const eff = rdShort(n.effective), exp = rdShort(n.expiration);
       const sched = n.permanent ? (eff ? `Permanente · desde ${eff}` : 'Permanente')
         : (exp ? `${eff || '—'} → ${exp}` : (eff ? `desde ${eff}` : '—'));
-      const long = (n.body || '').length > 230 || (n.body || '').split('\n').length > 6;
       return `<article class="notam-card ${imp ? 'alta' : ''}">
         <div class="ntop">
           <span class="nid">${esc(n.id)}</span>
@@ -1745,9 +1745,8 @@
           ${imp ? '<span class="nhigh">Alta</span>' : ''}
         </div>
         <div class="nsched">Vigencia: <b>${sched}</b> (hora RD)${n.tipo ? ` · ${esc(n.tipo)}` : ''}</div>
-        <div class="nbody ${long ? 'clamp' : ''}">${esc(n.body)}</div>
-        ${long ? `<button class="nmore" onclick="const b=this.previousElementSibling;b.classList.toggle('clamp');this.textContent=b.classList.contains('clamp')?'Ver completo':'Ver menos'">Ver completo</button>` : ''}
-        ${n.lectura ? `<div class="ninterp"><b>Lectura operativa</b>${n.lectura_ia ? '<span class="ia">IA</span>' : ''}: ${esc(n.lectura)}</div>` : ''}
+        ${n.lectura ? `<div class="nread">${esc(n.lectura)}${n.lectura_ia ? '<span class="ia">IA</span>' : ''}</div>` : ''}
+        <details class="nraw"><summary>Texto original del NOTAM</summary><pre>${esc(n.raw || n.body)}</pre></details>
         ${n.source ? `<div class="nfoot">Fuente: ${esc(n.source)}</div>` : ''}
       </article>`;
     }
