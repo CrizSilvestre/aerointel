@@ -6,7 +6,7 @@ Dominicana primero), selecciona imagen y publica un **periódico web** + una **A
 avisos a Mattermost. No es un blog de noticias: el objetivo es responder *"¿por qué esto importa para
 la operación de PUJ?"*.
 
-> Estado: **beta funcional**. Hub coordinado: **PUJ** (Aeropuerto Internacional de Punta Cana).
+> Estado: **beta funcional**. Hub coordinado: **PUJ** (Aeropuerto de Punta Cana).
 > También cubre SDQ / STI / POP y aviación global cuando impacta a RD/Caribe.
 >
 > **En vivo:** https://crizsilvestre.github.io/aerointel/ · API: `/api/news/latest.json`

@@ -667,7 +667,7 @@ def apply_ranking_adjustments(ev):
 SYSTEM_PROMPT = (
     "Actúas como analista senior de operaciones aeronáuticas que redacta para un boletín de inteligencia "
     "leído por jefes de operaciones de aeropuerto, despachadores y planificadores de red. Hub principal: "
-    "Aeropuerto Internacional de Punta Cana (PUJ), República Dominicana; también cubres SDQ, STI, POP y "
+    "Aeropuerto de Punta Cana (PUJ), República Dominicana; también cubres SDQ, STI, POP y "
     "aviación global cuando impacta a RD/Caribe.\n"
     "ESTÁNDAR EDITORIAL (estilo analista, no titular de prensa amarilla):\n"
     "- Analiza SOLO lo que dice el texto. NUNCA inventes cifras, aerolíneas, rutas ni causas. Si un dato no "
@@ -756,7 +756,7 @@ def analyze(text, n_sources):
 
 # ── Interpretación de NOTAMs con IA (texto llano). Reusa el proveedor LLM; respaldo heurístico. ──
 NOTAM_SYS = (
-    "Eres especialista en operaciones airside del Aeropuerto Internacional de Punta Cana (PUJ/MDPC). "
+    "Eres especialista en operaciones airside del Aeropuerto de Punta Cana (PUJ/MDPC). "
     "Explica el NOTAM en español claro y OPERATIVO en UNA sola frase breve (máx ~30 palabras): qué "
     "significa y su implicación concreta para la operación. NUNCA inventes datos que no estén en el texto. "
     "Directo y profesional, sin emojis, sin repetir el código crudo, sin frases de relleno.")
