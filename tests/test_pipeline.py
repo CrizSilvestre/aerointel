@@ -195,6 +195,46 @@ try:
 finally:
     A.urllib.request.urlopen, A.time.sleep = _real_urlopen, _real_sleep
 
+# ── Fail-fast: 429 con Retry-After largo (cuota agotada) NO se reintenta ──
+_calls["n"] = 0
+def _fake_urlopen_429_long(req, timeout=None, **kw):
+    _calls["n"] += 1
+    raise urllib.error.HTTPError("http://fake", 429, "Too Many Requests", {"Retry-After": "600"}, _io.BytesIO(b""))
+A.urllib.request.urlopen, A.time.sleep = _fake_urlopen_429_long, lambda s: None
+try:
+    try:
+        A._llm_post("http://fake", {}, {})
+        ok("retry · Retry-After largo falla directo", False)
+    except urllib.error.HTTPError:
+        ok("retry · Retry-After largo falla directo (1 llamada)", _calls["n"] == 1)
+finally:
+    A.urllib.request.urlopen, A.time.sleep = _real_urlopen, _real_sleep
+
+# ── Cortacircuito: fallos LLM consecutivos → resto de la corrida en heurística ──
+def _mkev_llm(i):
+    return {"items": [{"title": f"Evento {i}", "link": f"https://e.com/{i}", "source": "T", "desc": ""}],
+            "dt": None, "_txt": f"Evento {i}", "analysis": {}}
+_an_calls = {"n": 0}
+_real_analyze = A.analyze
+def _fake_analyze_fail(text, n_sources):
+    _an_calls["n"] += 1
+    A._LLM_STATS["fallbacks"] += 1          # simula: agotó reintentos y cayó a heurística
+    return A.analyze_heuristic(text, n_sources)
+A.analyze = _fake_analyze_fail
+try:
+    evs5 = [_mkev_llm(i) for i in range(5)]
+    done = A.apply_llm(evs5, top=5, pause=0)
+    ok("breaker · corta tras 3 fallos seguidos", _an_calls["n"] == 3 and done == 0)
+    _an_calls["n"] = 0
+    def _fake_analyze_ok(text, n_sources):
+        _an_calls["n"] += 1
+        return A.analyze_heuristic(text, n_sources)
+    A.analyze = _fake_analyze_ok
+    done = A.apply_llm([_mkev_llm(i) for i in range(4)], top=4, pause=0)
+    ok("breaker · sin fallos analiza todos", _an_calls["n"] == 4 and done == 4)
+finally:
+    A.analyze = _real_analyze
+
 # ── Monitor de salud: payload para Mattermost ──
 hp = A.health_payload([{"name": "Fuente X", "ok": False, "items": 0, "error": "HTTPError: 503"}],
                       21, notam_err="HTTP 429 rate limit", llm_fallbacks=2)

@@ -120,6 +120,7 @@ Ver `.env.example`. Las más relevantes:
 | `AEROINTEL_LLM_MAX` | 18 | Cuántos eventos top analiza el LLM (el resto, heurística). |
 | `AEROINTEL_LLM_SLEEP` | 2.0 | Pausa entre llamadas (respeta rate limits del free tier). |
 | `AEROINTEL_LLM_RETRIES` | 3 | Reintentos ante 429/5xx con backoff (respeta `Retry-After`; 4xx real no se reintenta). |
+| `AEROINTEL_LLM_BREAKER` | 3 | Cortacircuito: tras N eventos seguidos con LLM agotado, el resto de la corrida usa heurística. |
 | `AEROINTEL_MIN_SCORE` | 30 | Umbral de publicación. |
 | `AEROINTEL_IMG_N` | 48 | Cuántas notas top enriquecen con imagen. `AEROINTEL_NO_IMG=1` desactiva. |
 | `AEROINTEL_IMG_BOOST` | 4 | Empuje de score a notas con foto real (solo reordena la portada; 0 = off). |
@@ -193,8 +194,10 @@ consulta Regulatorio de Google News. Lo evaluado y descartado queda documentado 
 ### Resiliencia (diseñada para depender de servicios gratis)
 
 - **LLM con reintentos + backoff**: los 429 del free tier se reintentan (2s → 6s → 18s,
-  respetando `Retry-After`, tope 30 s); un 4xx real no se reintenta. Si todo falla, la nota
-  cae a la heurística — la corrida nunca se rompe.
+  respetando `Retry-After`, tope 30 s); un 4xx real no se reintenta y un `Retry-After` largo
+  (cuota por minutos/día) falla directo. Si todo falla, la nota cae a la heurística — la
+  corrida nunca se rompe. **Cortacircuito**: 3 eventos seguidos sin LLM → el resto de la
+  corrida va directo a heurística (no quema minutos del cron en reintentos condenados).
 - **Monitor de salud por corrida**: si una fuente cae, el NOTAM falla (con clave puesta) o el
   LLM degrada, se publica un **aviso a Mattermost** con el detalle — te enteras el día que
   pasa, no semanas después. Si todo está bien, no envía nada.

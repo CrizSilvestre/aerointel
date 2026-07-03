@@ -17,6 +17,10 @@ import store, apiexport, notams
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "output")
 UA = "AeroIntel/0.1 (+local MVP)"
+# UA de navegador para los FEEDS: algunos medios (p. ej. FlightGlobal) devuelven 403 a bots
+# declarados. Para las APIs de LLM se mantiene el UA propio (transparente y sin problema).
+FEED_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+           "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 MAX_PER_SOURCE = 25
 WHEN = os.environ.get("AEROINTEL_WHEN", "7d")                    # ventana de Google News (recencia)
 MAX_AGE_H = float(os.environ.get("AEROINTEL_MAX_AGE_H", "168"))  # descarta noticias más viejas (168h = 7 días)
@@ -38,7 +42,9 @@ def gnews_url(s):
     return f"https://news.google.com/rss/search?q={q}&hl={lang}&gl={gl}&ceid={gl}:{lang.split('-')[0]}"
 
 def fetch(url, timeout=20):
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    req = urllib.request.Request(url, headers={
+        "User-Agent": FEED_UA,
+        "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml, */*"})
     try:
         return urllib.request.urlopen(req, timeout=timeout).read()
     except (ssl.SSLError, urllib.error.URLError):
@@ -777,19 +783,26 @@ OPENAI_PROVIDERS = {
 LLM_RETRIES = int(os.environ.get("AEROINTEL_LLM_RETRIES", "3"))
 _LLM_STATS = {"fallbacks": 0, "retries": 0}    # contadores de la corrida (salud → consola/Mattermost)
 
+def _ra_seconds(retry_after):
+    """Parsea Retry-After (segundos) a float; None si no viene o no es numérico."""
+    try:
+        return float(retry_after)
+    except (TypeError, ValueError):
+        return None
+
 def _retry_delay(attempt, retry_after=None):
     """Espera antes del reintento N (desde 0). Respeta el Retry-After del proveedor (tope 30 s
     para no agotar el presupuesto del cron); si no viene, backoff exponencial 2s → 6s → 18s."""
-    if retry_after:
-        try:
-            return min(30.0, max(1.0, float(retry_after)))
-        except (TypeError, ValueError):
-            pass
+    ra = _ra_seconds(retry_after)
+    if ra is not None:
+        return min(30.0, max(1.0, ra))
     return 2.0 * (3 ** attempt)
 
 def _llm_post(url, payload, headers, timeout=60, tries=None):
     """POST JSON al proveedor LLM con reintentos. Reintenta SOLO lo transitorio (429/5xx/red);
-    un 4xx real (clave inválida, payload malo) se lanza de inmediato — reintentarlo es inútil."""
+    un 4xx real (clave inválida, payload malo) se lanza de inmediato — reintentarlo es inútil.
+    Un 429 con Retry-After largo (cuota por minutos/día agotada) también falla directo: esperar
+    dentro de la corrida no lo va a resolver."""
     tries = LLM_RETRIES if tries is None else tries
     last = None
     for attempt in range(tries):
@@ -798,6 +811,9 @@ def _llm_post(url, payload, headers, timeout=60, tries=None):
             req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers=headers)
             return json.loads(urllib.request.urlopen(req, timeout=timeout).read())
         except urllib.error.HTTPError as e:
+            ra = _ra_seconds(e.headers.get("Retry-After"))
+            if e.code == 429 and ra is not None and ra > 120:
+                raise                                # cuota larga: no quemar tiempo del cron
             if e.code == 429 or e.code >= 500:
                 last, delay = e, _retry_delay(attempt, e.headers.get("Retry-After"))
             else:
@@ -853,6 +869,28 @@ def analyze(text, n_sources):
             _LLM_STATS["fallbacks"] += 1
             print(f"   (LLM falló tras {LLM_RETRIES} intentos, uso heurística: {e})")
     return analyze_heuristic(text, n_sources)
+
+# Cortacircuito: si N eventos SEGUIDOS agotan sus reintentos (cuota/rate limit persistente),
+# el resto de la corrida va directo a heurística — sin quemar minutos en reintentos condenados.
+LLM_BREAKER = int(os.environ.get("AEROINTEL_LLM_BREAKER", "3"))
+
+def apply_llm(events, top, pause):
+    """Analiza con LLM los top-N eventos. Devuelve cuántos analizó de verdad (sin fallback)."""
+    done = consec = 0
+    for ev in events[:top]:
+        before = _LLM_STATS["fallbacks"]
+        ev["analysis"] = analyze(ev["_txt"], len(ev["items"]))
+        if _LLM_STATS["fallbacks"] > before:
+            consec += 1
+            if consec >= LLM_BREAKER:
+                print(f"  LLM: rate limit persistente ({consec} eventos seguidos) — "
+                      "el resto de la corrida usa heurística.")
+                break
+        else:
+            done += 1
+            consec = 0
+        time.sleep(pause)
+    return done
 
 # ── Interpretación de NOTAMs con IA (texto llano). Reusa el proveedor LLM; respaldo heurístico. ──
 NOTAM_SYS = (
@@ -1040,10 +1078,8 @@ def main():
     if prov:
         top = int(os.environ.get("AEROINTEL_LLM_MAX", "20"))
         pause = float(os.environ.get("AEROINTEL_LLM_SLEEP", "2"))
-        for ev in events[:top]:
-            ev["analysis"] = analyze(ev["_txt"], len(ev["items"]))
-            time.sleep(pause)
-        print(f"  LLM ({prov}) aplicado a los top {min(top, len(events))} eventos.")
+        done = apply_llm(events, top, pause)
+        print(f"  LLM ({prov}): {done}/{min(top, len(events))} eventos analizados por IA (resto heurística).")
 
     # 3) ajustes finales unificados: recencia + ruido + recaps + piso del núcleo RD
     for ev in events:
