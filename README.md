@@ -177,15 +177,15 @@ críticas U/S) y **estado** (vigente/programado), con la vigencia en **hora loca
 
 ## Fuentes y redes sociales (decisión de ingeniería)
 
-Se prioriza **calidad sobre cantidad** — 21 fuentes, todas verificadas vivas antes de agregarse:
+Se prioriza **calidad sobre cantidad** — 20 fuentes, todas verificadas vivas antes de agregarse:
 
 - **7 consultas Google News** acotadas: PUJ/RD, Aviation/Caribbean, Seguridad, Meteo Caribe,
   Meteo RD, **Regulatorio** (FAA/EASA/NTSB/ICAO) y **Rutas Caribe/Latam**.
-- **14 RSS directos**: Simple Flying, AeroTime, Aviation Week, Diario Libre, **NHC Atlántico**
+- **13 RSS directos**: Simple Flying, AeroTime, Aviation Week, Diario Libre, **NHC Atlántico**
   (ciclones — fuente oficial de meteo tropical), **NWS San Juan** (alertas Atom del vecino
   inmediato; vacío sin eventos activos), **Arecoa** (aviación RD), **Dominican Today**,
   Flightradar24, Leeham News (industria), A21, Aviación al Día (Latam, ES), **Airbus Press
-  (oficial)** y **FlightGlobal**.
+  (oficial)**.
 
 FAA/EASA/NTSB/Boeing no publican RSS estable (verificado: 404/timeout) — se cubren con la
 consulta Regulatorio de Google News. Lo evaluado y descartado queda documentado en

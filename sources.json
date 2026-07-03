@@ -27,10 +27,10 @@
     { "name": "Leeham News (industria)", "type": "rss", "url": "https://leehamnews.com/feed/" },
     { "name": "A21 (Latam, ES)", "type": "rss", "url": "https://a21.com.mx/feed" },
     { "name": "Aviación al Día (Latam, ES)", "type": "rss", "url": "https://aviacionaldia.com/feed" },
-    { "name": "Airbus Press (oficial)", "type": "rss", "url": "https://www.airbus.com/en/rss.xml" },
-    { "name": "FlightGlobal", "type": "rss", "url": "https://www.flightglobal.com/rss" }
+    { "name": "Airbus Press (oficial)", "type": "rss", "url": "https://www.airbus.com/en/rss.xml" }
   ],
   "_fuentes_evaluadas_sin_feed": [
+    "FlightGlobal (flightglobal.com/rss): funciona local pero devuelve 403 a las IPs de GitHub Actions — inservible en producción; su cobertura ya entra vía Google News",
     "FAA: /newsroom/rss.xml y /rss/all → 404 — cubierta vía Google News · Regulatorio",
     "EASA: /en/rss.xml y /rss.xml → 404 — cubierta vía Google News · Regulatorio",
     "NTSB: rss.aspx sin ítems; /rss/aviation.xml conexión falla — cubierta vía Google News · Regulatorio",
