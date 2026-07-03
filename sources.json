@@ -1,26 +1,43 @@
 {
-  "_comment": "Allowlist de fuentes (editable). type: gnews = Google News RSS por consulta; rss = feed directo.",
+  "_comment": "Allowlist de fuentes (editable). type: gnews = Google News RSS por consulta; rss = feed directo. Todos los feeds RSS fueron verificados vivos antes de agregarse.",
   "sources": [
     { "name": "Google News · PUJ/RD (ES)", "type": "gnews", "lang": "es-419", "gl": "DO",
       "query": "\"Punta Cana\" aeropuerto OR Arajet OR \"República Dominicana\" aviación OR vuelo cancelado OR nueva ruta" },
     { "name": "Google News · Aviation/Caribbean (EN)", "type": "gnews", "lang": "en-US", "gl": "US",
       "query": "aviation \"Punta Cana\" OR Caribbean airport OR \"Dominican Republic\" airline OR Airbus OR Boeing" },
-    { "name": "Simple Flying", "type": "rss", "url": "https://simpleflying.com/feed/" },
-    { "name": "AeroTime", "type": "rss", "url": "https://www.aerotime.aero/rss" },
-    { "name": "Aviation Week", "type": "rss", "url": "https://aviationweek.com/rss.xml" },
-    { "name": "Diario Libre (RD)", "type": "rss", "url": "https://www.diariolibre.com/rss/economia.xml" },
     { "name": "Google News · Seguridad/incidentes (EN)", "type": "gnews", "lang": "en-US", "gl": "US",
       "query": "aviation incident OR \"emergency landing\" OR \"aircraft\" diverted OR \"runway\" OR \"engine failure\"" },
     { "name": "Google News · Meteo Caribe (EN)", "type": "gnews", "lang": "en-US", "gl": "US",
       "query": "hurricane Caribbean OR \"tropical storm\" Caribbean OR \"Dominican Republic\" flights OR Caribbean airport weather disruption" },
     { "name": "Google News · Meteo RD (ES)", "type": "gnews", "lang": "es-419", "gl": "DO",
-      "query": "\"República Dominicana\" tiempo OR lluvias OR vaguada OR ONAMET OR inundaciones OR aguaceros OR \"alerta meteorológica\" OR \"mal tiempo\"" }
+      "query": "\"República Dominicana\" tiempo OR lluvias OR vaguada OR ONAMET OR inundaciones OR aguaceros OR \"alerta meteorológica\" OR \"mal tiempo\"" },
+    { "name": "Google News · Regulatorio (EN)", "type": "gnews", "lang": "en-US", "gl": "US",
+      "query": "aviation FAA OR EASA OR NTSB OR ICAO directive OR airworthiness OR certification OR ruling" },
+    { "name": "Google News · Rutas Caribe/Latam (ES)", "type": "gnews", "lang": "es-419", "gl": "DO",
+      "query": "aerolínea \"nueva ruta\" OR \"vuelo directo\" OR frecuencias OR \"nuevo destino\" Caribe OR Latinoamérica OR \"República Dominicana\"" },
+    { "name": "Simple Flying", "type": "rss", "url": "https://simpleflying.com/feed/" },
+    { "name": "AeroTime", "type": "rss", "url": "https://www.aerotime.aero/rss" },
+    { "name": "Aviation Week", "type": "rss", "url": "https://aviationweek.com/rss.xml" },
+    { "name": "Diario Libre (RD)", "type": "rss", "url": "https://www.diariolibre.com/rss/economia.xml" },
+    { "name": "NHC Atlántico (ciclones)", "type": "rss", "url": "https://www.nhc.noaa.gov/index-at.xml" },
+    { "name": "NWS San Juan · alertas (Atom)", "type": "rss", "url": "https://api.weather.gov/alerts/active.atom?area=PR" },
+    { "name": "Arecoa (RD)", "type": "rss", "url": "https://www.arecoa.com/feed/" },
+    { "name": "Dominican Today (EN)", "type": "rss", "url": "https://dominicantoday.com/feed/" },
+    { "name": "Flightradar24", "type": "rss", "url": "https://www.flightradar24.com/blog/feed/" },
+    { "name": "Leeham News (industria)", "type": "rss", "url": "https://leehamnews.com/feed/" },
+    { "name": "A21 (Latam, ES)", "type": "rss", "url": "https://a21.com.mx/feed" },
+    { "name": "Aviación al Día (Latam, ES)", "type": "rss", "url": "https://aviacionaldia.com/feed" },
+    { "name": "Airbus Press (oficial)", "type": "rss", "url": "https://www.airbus.com/en/rss.xml" },
+    { "name": "FlightGlobal", "type": "rss", "url": "https://www.flightglobal.com/rss" }
   ],
-  "_fuentes_oficiales_para_sumar": [
-    "NHC Atlántico (ciclones): https://www.nhc.gov/index-at.xml",
-    "aviationweather.gov (SIGMET/TAF API)",
-    "FAA / EASA / NTSB press feeds",
-    "Newsrooms Airbus y Boeing (RSS)",
-    "GDELT (eventos globales + tono)"
+  "_fuentes_evaluadas_sin_feed": [
+    "FAA: /newsroom/rss.xml y /rss/all → 404 — cubierta vía Google News · Regulatorio",
+    "EASA: /en/rss.xml y /rss.xml → 404 — cubierta vía Google News · Regulatorio",
+    "NTSB: rss.aspx sin ítems; /rss/aviation.xml conexión falla — cubierta vía Google News · Regulatorio",
+    "Boeing mediaroom: /rss → 404 — cubierta vía Google News · Aviation/Caribbean y Leeham",
+    "Aviacionline: /feed 404",
+    "Aviation Safety Network: conexión falla",
+    "aviationweather.gov (SIGMET/TAF API): datos operativos, no noticias — el dashboard ya usa su METAR en vivo",
+    "GDELT (eventos globales + tono): pendiente de evaluar"
   ]
 }

@@ -6,8 +6,12 @@
 import os, re, json, ssl, urllib.request, urllib.error
 from datetime import datetime, timezone
 
-ICAO_DEFAULT = os.environ.get("AEROINTEL_NOTAM_ICAO", "MDPC")   # MDPC = Aeropuerto Int. Punta Cana
+ICAO_DEFAULT = os.environ.get("AEROINTEL_NOTAM_ICAO", "MDPC")   # MDPC = Aeropuerto de Punta Cana
 RAPID_HOST = "skylink-api.p.rapidapi.com"
+# Fuente mostrada en cada tarjeta NOTAM (como en las noticias: nombre + enlace verificable).
+# La autoridad oficial de los NOTAM de RD es el AIS del IDAC; SkyLink es el proveedor de datos.
+SOURCE_NAME = os.environ.get("AEROINTEL_NOTAM_SOURCE", "AIS/IDAC · vía SkyLink")
+SOURCE_URL = os.environ.get("AEROINTEL_NOTAM_SOURCE_URL", "https://www.idac.gob.do/")
 
 
 def _parse_dt(s):
@@ -152,11 +156,13 @@ def normalize(n, now=None):
         "permanent": permanent,
         "body": body or raw,
         "raw": raw,
-        # Lectura operativa (heurística por defecto; la IA la mejora en el pipeline si hay LLM).
+        # Lectura operativa (heurística por defecto; el LLM la mejora en el pipeline si hay proveedor).
         "lectura": interpret_heuristic({"body": body, "raw": raw, "subject": subject}),
         "lectura_ia": False,
-        # SkyLink no trae 'source'; usamos el alcance (scope) traducido como etiqueta de origen.
-        "source": n.get("source") or _scope_es(n.get("scope")),
+        "scope": _scope_es(n.get("scope")),        # alcance del aviso (Aeródromo / En ruta / …)
+        # Fuente con enlace, como en las noticias. La autoridad oficial es AIS/IDAC.
+        "source": n.get("source") or SOURCE_NAME,
+        "source_url": SOURCE_URL,
     }
 
 

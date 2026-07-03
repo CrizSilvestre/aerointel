@@ -75,8 +75,12 @@ sin servidor; el FastAPI queda como módulo aditivo para quien quiera consultas 
 3. **Scoring inteligente (RD primero).** Modelo ponderado y **explicable** (`score_breakdown`):
    geografía (núcleo RD 42 / regional 18) + severidad + valor operacional de la categoría + riqueza
    de entidades + corroboración. Ajustes deterministas: recencia, **tope duro al ruido turístico**,
-   castigo a recaps y **piso para el núcleo RD**. Corrige falsos positivos por subcadena (p. ej.
-   `"jet"` dentro de `"objetivo"`) con límites de palabra.
+   castigo a recaps/pronósticos rutinarios y **piso para el núcleo RD**. Corrige falsos positivos
+   por subcadena (p. ej. `"jet"` dentro de `"objetivo"`, `"jac"` dentro de `"hijack"`) con límites
+   de palabra. El dashboard tiene **sección propia "República Dominicana"** (nav + portada, país
+   primero) alimentada por el nivel geográfico (`dr_tier`), y **"Hub PUJ"** con las noticias de
+   **mención directa** del aeropuerto (`puj_direct`: Punta Cana / PUJ / MDPC) — el criterio amplio
+   `affects_puj` (aerolíneas con operación en PUJ) se mantiene para alertas y API.
 
 4. **Actualización automática.** GitHub Actions cron **cada hora**: corre los tests, ejecuta el
    pipeline y **despliega a GitHub Pages**. El usuario abre la página y ya está al día. Ver más abajo.
@@ -115,8 +119,10 @@ Ver `.env.example`. Las más relevantes:
 | `GROQ_API_KEY` | — | Clave del proveedor (Groq es gratis: console.groq.com). |
 | `AEROINTEL_LLM_MAX` | 18 | Cuántos eventos top analiza el LLM (el resto, heurística). |
 | `AEROINTEL_LLM_SLEEP` | 2.0 | Pausa entre llamadas (respeta rate limits del free tier). |
+| `AEROINTEL_LLM_RETRIES` | 3 | Reintentos ante 429/5xx con backoff (respeta `Retry-After`; 4xx real no se reintenta). |
 | `AEROINTEL_MIN_SCORE` | 30 | Umbral de publicación. |
 | `AEROINTEL_IMG_N` | 48 | Cuántas notas top enriquecen con imagen. `AEROINTEL_NO_IMG=1` desactiva. |
+| `AEROINTEL_IMG_BOOST` | 4 | Empuje de score a notas con foto real (solo reordena la portada; 0 = off). |
 | `AEROINTEL_WHEN` / `AEROINTEL_MAX_AGE_H` | 7d / 168 | Ventana de recencia. |
 | `MATTERMOST_WEBHOOK_URL` | — | Si está, publica de verdad; si no, dry-run. |
 
@@ -146,6 +152,8 @@ críticas U/S) y **estado** (vigente/programado), con la vigencia en **hora loca
 - La clave (`RAPIDAPI_KEY`) es **server-side**: se usa en el pipeline / GitHub Actions y **nunca**
   llega al navegador ni se commitea. Sin clave/suscripción, la sección simplemente **no aparece**.
 - `AEROINTEL_NOTAM_DEMO=1` muestra NOTAMs de ejemplo para previsualizar la categoría.
+- Cada tarjeta cita su **fuente con enlace** (como las noticias): AIS/IDAC por defecto
+  (`AEROINTEL_NOTAM_SOURCE` / `AEROINTEL_NOTAM_SOURCE_URL` lo personalizan).
 - Referencial/operativo — la **fuente oficial es AIS/IDAC**.
 
 > Endpoint real usado: `GET https://skylink-api.p.rapidapi.com/notams/{ICAO}` (fechas en formato
@@ -168,10 +176,30 @@ críticas U/S) y **estado** (vigente/programado), con la vigencia en **hora loca
 
 ## Fuentes y redes sociales (decisión de ingeniería)
 
-Se prioriza **calidad sobre cantidad**: Google News por consultas acotadas (RD, seguridad, meteo
-Caribe) + **RSS directos** confiables (Simple Flying, AeroTime, Aviation Week, Diario Libre). Sumar
-fuentes oficiales (NHC, aviationweather.gov, FAA/EASA/NTSB, newsrooms Airbus/Boeing) está previsto en
-`sources.json` → `_fuentes_oficiales_para_sumar`.
+Se prioriza **calidad sobre cantidad** — 21 fuentes, todas verificadas vivas antes de agregarse:
+
+- **7 consultas Google News** acotadas: PUJ/RD, Aviation/Caribbean, Seguridad, Meteo Caribe,
+  Meteo RD, **Regulatorio** (FAA/EASA/NTSB/ICAO) y **Rutas Caribe/Latam**.
+- **14 RSS directos**: Simple Flying, AeroTime, Aviation Week, Diario Libre, **NHC Atlántico**
+  (ciclones — fuente oficial de meteo tropical), **NWS San Juan** (alertas Atom del vecino
+  inmediato; vacío sin eventos activos), **Arecoa** (aviación RD), **Dominican Today**,
+  Flightradar24, Leeham News (industria), A21, Aviación al Día (Latam, ES), **Airbus Press
+  (oficial)** y **FlightGlobal**.
+
+FAA/EASA/NTSB/Boeing no publican RSS estable (verificado: 404/timeout) — se cubren con la
+consulta Regulatorio de Google News. Lo evaluado y descartado queda documentado en
+`sources.json` → `_fuentes_evaluadas_sin_feed`.
+
+### Resiliencia (diseñada para depender de servicios gratis)
+
+- **LLM con reintentos + backoff**: los 429 del free tier se reintentan (2s → 6s → 18s,
+  respetando `Retry-After`, tope 30 s); un 4xx real no se reintenta. Si todo falla, la nota
+  cae a la heurística — la corrida nunca se rompe.
+- **Monitor de salud por corrida**: si una fuente cae, el NOTAM falla (con clave puesta) o el
+  LLM degrada, se publica un **aviso a Mattermost** con el detalle — te enteras el día que
+  pasa, no semanas después. Si todo está bien, no envía nada.
+- **Degradación elegante en todo**: fuente caída → se omite; sin imagen → ficha de
+  inteligencia; sin LLM → heurística; sin clave NOTAM → sección oculta.
 
 **Instagram / redes sociales:** no existe API pública estable para leer perfiles/reels de terceros;
 el scraping de Instagram es frágil y viola sus términos. La vía profesional es **RSS/feeds oficiales

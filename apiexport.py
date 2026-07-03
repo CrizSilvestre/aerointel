@@ -18,7 +18,8 @@ def _event_public(ev, human_age):
         "categoria": a["categoria"],
         "severidad": a["severidad"],
         "impact_score": a["impact_score"],
-        "affects_puj": bool(a.get("affects_puj")),
+        "affects_puj": bool(a.get("affects_puj")),      # criterio amplio (aerolíneas con operación en PUJ)
+        "puj_direct": bool(a.get("puj_direct")),        # mención directa del hub (Punta Cana/PUJ/MDPC)
         "dr_tier": a.get("dr_tier"),
         "angulo_editorial": a.get("angulo_editorial", ""),
         "resumen": a.get("resumen", ""),

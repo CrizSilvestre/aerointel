@@ -251,24 +251,34 @@
       flex-shrink: 0;
     }
 
-    /* ── Nav ── */
+    /* ── Nav: SIEMPRE una sola línea (desliza horizontal si no cabe; nunca filas huérfanas).
+       Los márgenes auto del primer/último botón centran cuando hay espacio y se anulan
+       correctamente al desbordar (a diferencia de justify-content:center). ── */
     nav.sections {
       display: flex;
       gap: 2px;
-      justify-content: center;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
+      overflow-x: auto;
       background: var(--navy);
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
     }
+
+    nav.sections::-webkit-scrollbar { display: none; }
+    nav.sections button:first-child { margin-left: auto; }
+    nav.sections button:last-child { margin-right: auto; }
 
     nav.sections button {
       border: 0;
       background: transparent;
       color: #cdd7ea;
-      font-size: 13px;
+      font-size: 12.5px;
       font-weight: 600;
-      padding: 11px 15px;
+      padding: 11px 13px;
       cursor: pointer;
       letter-spacing: .3px;
+      flex: 0 0 auto;
+      white-space: nowrap;
     }
 
     nav.sections button:hover {
@@ -1177,20 +1187,8 @@
         font-size: 11px;
       }
 
-      /* nav: barra deslizable horizontal en vez de envolver */
-      nav.sections {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        justify-content: flex-start;
-        -webkit-overflow-scrolling: touch;
-      }
-
-      nav.sections::-webkit-scrollbar {
-        display: none;
-      }
-
+      /* nav: la barra base ya es deslizable en una línea; aquí solo ajustes de tamaño */
       nav.sections button {
-        flex: 0 0 auto;
         padding: 11px 14px;
       }
 
@@ -1268,9 +1266,14 @@
     }
 
     /* ── NOTAMs activos de la estación (MDPC) ── */
-    .notam-note { font-size: 12.5px; color: var(--muted); margin-bottom: 14px; line-height: 1.5; }
+    .notam-note { font-size: 12.5px; color: var(--muted); margin-bottom: 10px; line-height: 1.5; }
     .notam-note .notam-disc { opacity: .8; }
+    /* Resumen operativo: conteo por sujeto (llena la sección y permite escanear de un vistazo) */
+    .notam-sum { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
+    .notam-sum span { font-size: 11px; font-weight: 700; color: var(--navy2); background: #eef2f9; border: 1px solid var(--line); border-radius: 20px; padding: 3px 11px; }
+    .notam-sum span.alta { color: #fff; background: var(--crit); border-color: var(--crit); }
     .notam-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; align-items: start; }
+    @media(min-width:1100px) { .notam-grid { grid-template-columns: repeat(3, 1fr); } }
     .notam-card {
       background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--info);
       border-radius: 8px; padding: 12px 15px;
@@ -1292,8 +1295,8 @@
       display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
       min-height: 4.5em;
     }
-    .notam-card .nia { font-size: 9px; font-weight: 800; letter-spacing: .4px; color: #fff; background: var(--navy2); border-radius: 3px; padding: 1px 5px; }
     .notam-card .nfoot { font-size: 10.5px; color: var(--muted); margin-top: 9px; }
+    .notam-card .nfoot a { color: var(--navy2); font-weight: 700; }
     /* texto original del NOTAM: colapsado por defecto, sin dominar la tarjeta */
     .notam-card .nraw { margin-top: 2px; }
     .notam-card .nraw summary { font-size: 11px; font-weight: 700; color: var(--navy2); cursor: pointer; }
@@ -1633,9 +1636,12 @@
       render();
     }));
 
-    // nav
+    // nav — República Dominicana como sección propia (país primero: feedback de gerencia)
+    const isRD = e => e.dr === 'core';
     const cats = [...new Set(EVENTS.map(e => e.cat))];
-    const NAV = [['portada', 'Portada'], ['breaking', 'Última hora'], ['puj', 'Solo PUJ'],
+    const NAV = [['portada', 'Portada'], ['breaking', 'Última hora'],
+    ...(EVENTS.some(isRD) ? [['rd', 'Rep. Dominicana']] : []),
+    ['puj', 'Hub PUJ'],
     ...(NOTAMS.length ? [['notam', `NOTAM ${NOTAMS.length}`]] : []),
     ...cats.map(c => ['cat:' + c, catOf(c).label])];
     let view = 'portada';
@@ -1747,21 +1753,28 @@
           <span class="nid">${esc(n.id)}</span>
           <span class="nsub">${esc(n.subject)}</span>
           <span class="nstat ${n.status}">${statusES}</span>
-          ${n.lectura_ia ? '<span class="nia">IA</span>' : ''}
           ${imp ? '<span class="nhigh">Alta</span>' : ''}
         </div>
         <div class="nsched">Vigencia: <b>${sched}</b> (hora RD)${n.tipo ? ` · ${esc(n.tipo)}` : ''}</div>
         ${n.lectura ? `<div class="nread">${esc(n.lectura)}</div>` : ''}
         <details class="nraw"><summary>Texto original del NOTAM</summary><pre>${esc(n.raw || n.body)}</pre></details>
-        ${n.source ? `<div class="nfoot">Fuente: ${esc(n.source)}</div>` : ''}
+        <div class="nfoot">Fuente: ${esc(n.source || 'AIS/IDAC')}${n.source_url ? ` · <a href="${esc(n.source_url)}" target="_blank" rel="noopener">Ver fuente</a>` : ''}</div>
       </article>`;
     }
     function notamView(high) {
       const cards = NOTAMS.map(notamCard).join('') || `<p style="color:var(--muted)">Sin NOTAMs activos en la estación.</p>`;
+      // Resumen por sujeto operativo: da lectura de un vistazo y densidad a la sección.
+      const bySubj = {};
+      NOTAMS.forEach(n => { bySubj[n.subject] = (bySubj[n.subject] || 0) + 1; });
+      const sumChips = NOTAMS.length ? `<div class="notam-sum">
+        ${high ? `<span class="alta">Alta importancia · ${high}</span>` : ''}
+        ${Object.entries(bySubj).sort((a, b) => b[1] - a[1]).map(([s, c]) => `<span>${esc(s)} · ${c}</span>`).join('')}
+      </div>` : '';
       return `<div class="section">
         <div class="section-h"><span class="t">NOTAM · MDPC (Punta Cana)</span><span class="rule"></span></div>
         <div class="notam-note">Avisos a la navegación aérea vigentes y programados en la estación · <b>${NOTAMS.length}</b> activos${high ? ` · <b style="color:var(--crit)">${high} de alta importancia</b>` : ''}.
         <span class="notam-disc">Operativo y referencial — la fuente oficial es AIS/IDAC.</span></div>
+        ${sumChips}
         <div class="notam-grid">${cards}</div>
       </div>`;
     }
@@ -1778,6 +1791,10 @@
         const lead = pool[0];
         let html = `<div class="lead">${heroHTML(lead)}${railHTML(pool.slice(1, 6))}</div>`;
         const used = new Set([lead, ...pool.slice(1, 6)]);
+        // País primero: sección República Dominicana antes de las temáticas.
+        const rdList = pool.filter(e => isRD(e) && !used.has(e)).slice(0, 3);
+        rdList.forEach(e => used.add(e));
+        html += sectionHTML('República Dominicana', rdList);
         const order = ['operaciones', 'seguridad', 'meteo', 'rutas', 'industria', 'regulatorio', 'tecnologia'];
         const seen = new Set();
         order.forEach(c => {
@@ -1797,8 +1814,10 @@
         if (view === 'breaking') {
           list = EVENTS.filter(e => isBreaking(e) && timeOK(e)).sort(byRecency);
           title = 'Última hora (≤24 h)';
+        } else if (view === 'rd') {
+          list = EVENTS.filter(e => isRD(e) && timeOK(e)); title = 'República Dominicana · noticias del país';
         } else if (view === 'puj') {
-          list = EVENTS.filter(e => e.puj && timeOK(e)); title = 'Solo PUJ';
+          list = EVENTS.filter(e => e.puj && timeOK(e)); title = 'Hub PUJ · mención directa del aeropuerto';
         } else {
           const c = view.slice(4); list = EVENTS.filter(e => e.cat === c && timeOK(e)); title = catOf(c).label;
         }

@@ -214,6 +214,22 @@ def fetch_images_parallel(events, n=20, max_workers=8):
         ev["image_url"] = u
     print(f" {kept}/{len(top)} con imagen real y única (resto → ficha de inteligencia).")
 
+# Boost visual: una nota con foto real sube un poco en el ranking (portada más atractiva) sin
+# alterar el fondo del modelo. Se aplica DESPUÉS del umbral de publicación: solo reordena.
+IMG_BOOST = int(os.environ.get("AEROINTEL_IMG_BOOST", "4"))
+
+def apply_image_boost(events, boost=None):
+    boost = IMG_BOOST if boost is None else boost
+    if boost <= 0:
+        return
+    for ev in events:
+        if ev.get("image_url"):
+            a = ev["analysis"]
+            a["impact_score"] = min(100, a["impact_score"] + boost)
+            if isinstance(a.get("score_breakdown"), dict):
+                a["score_breakdown"]["img"] = boost
+    events.sort(key=lambda e: e["analysis"]["impact_score"], reverse=True)
+
 # ───────────────────────── dedup / cluster ─────────────────────────
 def canonical(url):
     return re.sub(r"[?#].*$", "", url or "").rstrip("/").lower()
@@ -241,7 +257,7 @@ KW = {
                     "tormenta tropical", "huracán", "ciclón", "depresión tropical", "onamet", "nhc",
                     "vaguada", "inundaci", "alerta meteorol", "alerta verde", "alerta amarilla",
                     "alerta roja", "marejada", "oleaje", "frente frío", "frente frio", "aguacero",
-                    "granizo", "tornado", "flooding", "thunderstorm"],
+                    "granizo", "tornado", "flooding", "thunderstorm", "lluvia", "rain"],
     "seguridad":   ["crash", "accident", "incident", "emergency", "mayday", "evacuat", "fire", "smoke", "aog",
                     "close call", "near miss", "near-miss", "go-around", "go around", "loss of separation",
                     "tcas", "bird strike", "hard landing", "tail strike", "runway excursion", "rejected takeoff",
@@ -318,8 +334,9 @@ DR_CORE = ["punta cana", "puj", "santo domingo", "sdq", " sti ", "santiago de lo
            "república dominicana", "republica dominicana", "dominican republic", "aerodom",
            "idac", "junta de aviación civil", "jac", "arajet", "sky high", "onamet"]
 # Anillo regional/Caribe: relevante por proximidad y rutas, pero menor peso que el núcleo RD.
-DR_REGIONAL = ["dominican", "caribbean", "caribe", "puerto rico", "san juan sju", "cuba", "haiti",
-               "haití", "jamaica", "bahamas", "antilles", "antillas", "hispaniola"]
+# "nws san juan" = firma de las alertas Atom del NWS de Puerto Rico (vecino inmediato de RD).
+DR_REGIONAL = ["dominican", "caribbean", "caribe", "puerto rico", "san juan sju", "nws san juan",
+               "cuba", "haiti", "haití", "jamaica", "bahamas", "antilles", "antillas", "hispaniola"]
 DR_TERMS = DR_CORE + DR_REGIONAL  # compat: is_dr/is_relevant siguen viendo todo el universo RD/Caribe
 WX_REGION = ["caribbean", "caribe", "atlantic", "atlántico", "dominican", "punta cana", "cuba",
              "jamaica", "bahamas", "hispaniola", "haiti", "haití", "puerto rico", "antilles", "antillas"]
@@ -335,17 +352,31 @@ WX_TERMS = WX_TROPICAL + [
     "storm", "thunderstorm", "flooding", "flood", "fog", "gale", "squall", "downpour"]
 # Filtro de clima con LÍMITE DE PALABRA (no subcadena) → evita fugas tipo 'temporal' en 'temporalmente'.
 WX_RE = word_re(WX_TERMS)
+# Ciclones de la cuenca atlántica (NHC): un sistema tropical en el Atlántico es señal operativa
+# para RD aunque el aviso aún no nombre al Caribe (la trayectoria puede alcanzarlo).
+WX_TROPICAL_RE = word_re(WX_TROPICAL)
+ATLANTIC_RE = re.compile(r"\batl[aá]ntic", re.I)
 # Ruido turístico/marketing sin valor operacional → se castiga fuerte y se filtra.
 NOISE_RE = re.compile(
     r"\b(best time to (?:book|visit)|how to (?:book|find|score|visit|travel|get to)|"
     r"when to (?:book|visit|go)|cheapest|cheap flights to|deals?|things to do|guide to|top \d+|"
     r"\d+ (?:best|reasons|things|ways|places)|bucket list|all-inclusive|vacation package|review:|"
     r"travel tips|what to (?:do|pack|know before)|honeymoon|where to stay|nightlife|best beaches|"
+    r"best [\w'’ -]{0,30}destinations?|destinations? to visit|to visit year[- ]?round|where to go|"
     r"during hurricane season|cruise|resort|getaway|staycation|romantic|family[- ]friendly)\b",
     re.I)
 
+# Matching RD con LÍMITE DE PALABRA (no subcadena): evita falsos positivos de acrónimos cortos
+# ('jac' dentro de 'hijack', 'puj' dentro de 'puja/Pujols'). Reusa _kw_pat: ≤4 chars = palabra exacta.
+# Códigos IATA que además son palabras comunes (POP-up, STI…) solo cuentan EN MAYÚSCULAS.
+_DR_AMBIG_CODES = {"pop", "sti", "azs", "lrm"}
+_DR_CODES_CS_RE = re.compile(r"\b(" + "|".join(c.upper() for c in sorted(_DR_AMBIG_CODES)) + r")\b")
+DR_CORE_RE = word_re([k.strip() for k in DR_CORE if k.strip() not in _DR_AMBIG_CODES])
+DR_REGIONAL_RE = word_re([k.strip() for k in DR_REGIONAL])
+
 def is_dr(text):
-    return any(k in (text or "").lower() for k in DR_TERMS)
+    t = text or ""
+    return bool(DR_CORE_RE.search(t) or _DR_CODES_CS_RE.search(t) or DR_REGIONAL_RE.search(t))
 
 # Señal aeronáutica: una nota DEBE tener contexto de aviación para entrar (no basta nombrar a RD).
 # Evita ruido de feeds generales (economía/agro de Diario Libre). Se usa LÍMITE DE PALABRA: tokens
@@ -370,6 +401,9 @@ def is_relevant(text):
     # Clima que afecta a RD/Caribe entra como meteo (afecta operaciones de PUJ aunque no diga "avión").
     if WX_RE.search(t) and dr_tier(t) is not None:
         return True
+    # Ciclón/tormenta tropical en la cuenca del Atlántico (NHC) — vigilancia aunque no nombre al Caribe.
+    if WX_TROPICAL_RE.search(t) and ATLANTIC_RE.search(t):
+        return True
     return False
 
 # ── Extracción de contexto del título para ángulo editorial dinámico ──
@@ -380,7 +414,12 @@ _PLACE_RE    = re.compile(r'\b(Punta Cana|PUJ|Santo Domingo|SDQ|Santiago|STI|La 
                           r'Atlanta|Fort Lauderdale|Cancún|Cancun|San Juan|Bogotá|Bogota|Medellín|Lima|'
                           r'Panama|Toronto|Montreal|London|Madrid|Paris|Amsterdam|Chicago|Dallas|Houston|'
                           r'Los Angeles|LAX|Orlando|Caribbean|Caribe|Dominican Republic|República Dominicana)\b', re.I)
-_WX_EVENT_RE = re.compile(r'\b(Hurricane\s+\w+|Tropical Storm\s+\w+|huracán\s+\w+|tormenta tropical\s+\w+|ciclón\s+\w+)\b', re.I)
+# Nombre propio del sistema tropical ("Hurricane Melissa") — se excluyen palabras institucionales
+# ("Hurricane Center/Season/Warning") que no son nombres de ciclón.
+_WX_EVENT_RE = re.compile(
+    r'\b(Hurricane\s+(?!Center|Centre|Season|Watch|Warning|Hunters|Preparedness)\w+|'
+    r'Tropical Storm\s+(?!Warning|Watch|Season)\w+|'
+    r'huracán\s+\w+|tormenta tropical\s+(?!en|del|de)\w+|ciclón\s+(?!tropical)\w+)\b', re.I)
 
 def _extract_context(text):
     """Extrae entidades relevantes del texto para construir un ángulo editorial contextual."""
@@ -579,12 +618,17 @@ def _build_editorial(cat, sev, text, airlines, puj, ctx):
 
 def dr_tier(text):
     """'core' = aeropuerto/autoridad/aerolínea RD · 'regional' = Caribe/proximidad · None = fuera de zona."""
-    tl = (text or "").lower()
-    if any(k in tl for k in DR_CORE):
+    t = text or ""
+    if DR_CORE_RE.search(t) or _DR_CODES_CS_RE.search(t):
         return "core"
-    if any(k in tl for k in DR_REGIONAL):
+    if DR_REGIONAL_RE.search(t):
         return "regional"
     return None
+
+# Mención DIRECTA del hub (Punta Cana / PUJ / MDPC / Grupo Puntacana). Distingue la vista
+# "Hub PUJ" del dashboard (solo el aeropuerto) de "República Dominicana" (todo el país):
+# affects_puj sigue siendo el criterio AMPLIO (aerolíneas con operación en PUJ) para alertas/API.
+PUJ_DIRECT_RE = re.compile(r"(?i:punta\s?cana)|\bPUJ\b|\bMDPC\b")
 
 # Pesos del modelo de relevancia (transparentes y testeables). El eje dominante es la geografía:
 # una noticia de RD parte con un piso alto; una global sin relación operacional se queda abajo.
@@ -629,6 +673,15 @@ def analyze_heuristic(text, n_sources, dt=None):
 RECAP_RE = re.compile(r"\b(recap|roundup|round-up|explained|timeline|what we know|in photos|"
                       r"cronolog|resumen del|a look back|year in review)\b", re.I)
 
+# Contenido RUTINARIO / NO OPERACIONAL: pronóstico diario (temperatura/probabilidad de lluvia)
+# y noticias de asistencia social post-evento (bonos, subsidios). Se hunden bajo el umbral;
+# las alertas reales (ONAMET, ciclones, vaguadas) usan otro vocabulario y no caen aquí.
+ROUTINE_WX_RE = re.compile(
+    r"(temperatura y probabilidad de lluvia|probabilidad de lluvia para|pron[oó]stico del tiempo|"
+    r"el tiempo (?:para )?hoy|clima (?:de |en )[^:]{2,40}: temperatura|temperaturas? para hoy|"
+    r"weather forecast for (?:today|this week)|daily (?:weather )?forecast|"
+    r"bonos? de emergencia|bono (?:social|navideño)|subsidios?\b|asistencia social|tarjeta (?:de )?solidaridad)", re.I)
+
 def apply_ranking_adjustments(ev):
     """Correcciones deterministas sobre CUALQUIER score (heurístico o LLM): recencia, ruido,
     recaps y un piso para el núcleo RD. Garantiza prioridad RD y supresión de ruido turístico."""
@@ -637,6 +690,12 @@ def apply_ranking_adjustments(ev):
     # Titular de respaldo limpio si el LLM no reescribió (quita " - Publicación" y tracking).
     if not a.get("titular"):
         a["titular"] = clean_title(ev["items"][0]["title"])
+    # dr_tier SIEMPRE determinista desde el texto (el LLM no lo devuelve): alimenta la sección
+    # República Dominicana del dashboard, la BD y la API.
+    if not a.get("dr_tier"):
+        a["dr_tier"] = dr_tier(txt)
+    # Mención directa del hub: alimenta la vista "Hub PUJ" y el badge PUJ del dashboard.
+    a["puj_direct"] = bool(PUJ_DIRECT_RE.search(txt))
     age = age_hours(ev.get("dt"))
     is_noise = bool(NOISE_RE.search(txt))
     # Recencia con peso FUERTE: la portada debe sentirse viva. Lo muy reciente sube; lo viejo
@@ -649,6 +708,11 @@ def apply_ranking_adjustments(ev):
     if is_noise:
         a["impact_score"] = min(a["impact_score"], 10)
         a["severidad"] = "info"
+    # Pronóstico rutinario del día: informativo pero no inteligencia operacional → bajo el umbral.
+    if ROUTINE_WX_RE.search(txt):
+        a["impact_score"] = min(a["impact_score"], 24)
+        a["severidad"] = "info"
+        is_noise = True                              # tampoco aplica el piso RD
     # Recap/cronología de evento ya ocurrido: no es breaking
     if RECAP_RE.search(ev["items"][0]["title"]):
         a["impact_score"] -= 20
@@ -656,7 +720,7 @@ def apply_ranking_adjustments(ev):
             a["severidad"] = "importante"
     # Piso para el núcleo RD: una noticia OPERATIVA de RD nunca debe quedar sepultada.
     # No aplica a ruido turístico/marketing aunque mencione "Punta Cana".
-    if not is_noise and (a.get("dr_tier") == "core" or dr_tier(txt) == "core") and a["severidad"] != "info":
+    if not is_noise and a["dr_tier"] == "core" and a["severidad"] != "info":
         a["impact_score"] = max(a["impact_score"], 55)
         a["affects_puj"] = True
     a["impact_score"] = max(0, min(100, a["impact_score"]))
@@ -708,6 +772,43 @@ OPENAI_PROVIDERS = {
     "cerebras":   ("https://api.cerebras.ai/v1/chat/completions", "llama3.1-8b", "CEREBRAS_API_KEY"),
 }
 
+# ── Resiliencia del LLM: reintentos con backoff. En free tier los 429 (rate limit) son normales;
+#    reintentar con espera recupera el análisis en vez de degradar a heurística. ──
+LLM_RETRIES = int(os.environ.get("AEROINTEL_LLM_RETRIES", "3"))
+_LLM_STATS = {"fallbacks": 0, "retries": 0}    # contadores de la corrida (salud → consola/Mattermost)
+
+def _retry_delay(attempt, retry_after=None):
+    """Espera antes del reintento N (desde 0). Respeta el Retry-After del proveedor (tope 30 s
+    para no agotar el presupuesto del cron); si no viene, backoff exponencial 2s → 6s → 18s."""
+    if retry_after:
+        try:
+            return min(30.0, max(1.0, float(retry_after)))
+        except (TypeError, ValueError):
+            pass
+    return 2.0 * (3 ** attempt)
+
+def _llm_post(url, payload, headers, timeout=60, tries=None):
+    """POST JSON al proveedor LLM con reintentos. Reintenta SOLO lo transitorio (429/5xx/red);
+    un 4xx real (clave inválida, payload malo) se lanza de inmediato — reintentarlo es inútil."""
+    tries = LLM_RETRIES if tries is None else tries
+    last = None
+    for attempt in range(tries):
+        delay = None
+        try:
+            req = urllib.request.Request(url, data=json.dumps(payload).encode(), headers=headers)
+            return json.loads(urllib.request.urlopen(req, timeout=timeout).read())
+        except urllib.error.HTTPError as e:
+            if e.code == 429 or e.code >= 500:
+                last, delay = e, _retry_delay(attempt, e.headers.get("Retry-After"))
+            else:
+                raise
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            last, delay = e, _retry_delay(attempt)
+        if attempt < tries - 1:
+            _LLM_STATS["retries"] += 1
+            time.sleep(delay)
+    raise last
+
 def _parse_llm_json(txt):
     r = json.loads(re.search(r"\{.*\}", txt, re.S).group(0))
     r.setdefault("impact_score", 50); r.setdefault("affects_puj", False); r.setdefault("aerolineas", [])
@@ -723,9 +824,8 @@ def analyze_anthropic(text):
     model = os.environ.get("AEROINTEL_MODEL", "claude-haiku-4-5-20251001")
     payload = {"model": model, "max_tokens": 500, "system": SYSTEM_PROMPT,
                "messages": [{"role": "user", "content": text[:4000]}]}
-    req = urllib.request.Request("https://api.anthropic.com/v1/messages", data=json.dumps(payload).encode(),
-        headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json", "User-Agent": UA})
-    raw = json.loads(urllib.request.urlopen(req, timeout=60).read())
+    raw = _llm_post("https://api.anthropic.com/v1/messages", payload,
+        {"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json", "User-Agent": UA})
     return _parse_llm_json(raw["content"][0]["text"])
 
 def analyze_openai_compatible(text, prov):
@@ -734,9 +834,8 @@ def analyze_openai_compatible(text, prov):
     model = os.environ.get("AEROINTEL_MODEL", default_model)
     payload = {"model": model, "max_tokens": 500, "temperature": 0.2,
                "messages": [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": text[:4000]}]}
-    req = urllib.request.Request(base, data=json.dumps(payload).encode(),
-        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json", "User-Agent": UA})
-    raw = json.loads(urllib.request.urlopen(req, timeout=60).read())
+    raw = _llm_post(base, payload,
+        {"Authorization": f"Bearer {key}", "Content-Type": "application/json", "User-Agent": UA})
     return _parse_llm_json(raw["choices"][0]["message"]["content"])
 
 def analyze(text, n_sources):
@@ -751,7 +850,8 @@ def analyze(text, n_sources):
                 return analyze_openai_compatible(text, prov)
             print(f"   (proveedor LLM '{prov}' no reconocido — uso heurística)")
         except Exception as e:
-            print(f"   (LLM falló, uso heurística: {e})")
+            _LLM_STATS["fallbacks"] += 1
+            print(f"   (LLM falló tras {LLM_RETRIES} intentos, uso heurística: {e})")
     return analyze_heuristic(text, n_sources)
 
 # ── Interpretación de NOTAMs con IA (texto llano). Reusa el proveedor LLM; respaldo heurístico. ──
@@ -768,18 +868,20 @@ def llm_complete(system, user, prov, max_tokens=220):
             model = os.environ.get("AEROINTEL_MODEL", "claude-haiku-4-5-20251001")
             payload = {"model": model, "max_tokens": max_tokens, "system": system,
                        "messages": [{"role": "user", "content": user[:1500]}]}
-            req = urllib.request.Request("https://api.anthropic.com/v1/messages", data=json.dumps(payload).encode(),
-                headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json", "User-Agent": UA})
-            return json.loads(urllib.request.urlopen(req, timeout=40).read())["content"][0]["text"].strip()
+            raw = _llm_post("https://api.anthropic.com/v1/messages", payload,
+                {"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json", "User-Agent": UA},
+                timeout=40)
+            return raw["content"][0]["text"].strip()
         if prov in OPENAI_PROVIDERS:
             base, default_model, key_env = OPENAI_PROVIDERS[prov]
             key = os.environ.get(key_env) or os.environ.get("LLM_API_KEY", "")
             model = os.environ.get("AEROINTEL_MODEL", default_model)
             payload = {"model": model, "max_tokens": max_tokens, "temperature": 0.2,
                        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user[:1500]}]}
-            req = urllib.request.Request(base, data=json.dumps(payload).encode(),
-                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json", "User-Agent": UA})
-            return json.loads(urllib.request.urlopen(req, timeout=40).read())["choices"][0]["message"]["content"].strip()
+            raw = _llm_post(base, payload,
+                {"Authorization": f"Bearer {key}", "Content-Type": "application/json", "User-Agent": UA},
+                timeout=40)
+            return raw["choices"][0]["message"]["content"].strip()
     except Exception:
         return None
 
@@ -816,6 +918,20 @@ def to_mattermost(ev):
                              "text": text,
                              "footer": f"Fuentes: {sources} · {len(ev['items'])} fuente(s) · {datetime.now():%d %b %Y %H:%M}",
                              "actions": [{"type": "button", "name": "Ver fuente", "url": first["link"]}]}]}
+
+# ── Monitor de salud: aviso a Mattermost el DÍA que algo falle (fuente caída, NOTAM, LLM
+#    degradado), no semanas después. Solo se envía si hay algo que reportar. ──
+def health_payload(fails, total_sources, notam_err=None, llm_fallbacks=0):
+    lines = [f"- **{f['name']}**: {f['error']}" for f in fails]
+    if notam_err:
+        lines.append(f"- **NOTAM (SkyLink)**: {notam_err}")
+    if llm_fallbacks:
+        lines.append(f"- **LLM**: {llm_fallbacks} evento(s) cayeron a heurística (rate limit/errores persistentes)")
+    text = (f"**Monitor de salud de la corrida** · {len(fails)}/{total_sources} fuentes con fallo\n\n"
+            + "\n".join(lines)
+            + "\n\n_Degradación elegante: el resto del pipeline corrió normal. Revisar si el fallo persiste en corridas siguientes._")
+    return {"username": "AeroIntel",
+            "attachments": [{"color": "#e69100", "title": "⚠ Salud de fuentes", "text": text}]}
 
 def write_briefing(events):
     lines = ["# Daily Aviation Briefing · AeroIntel", f"_{datetime.now():%d %b %Y %H:%M} · Hub: PUJ_", ""]
@@ -861,7 +977,10 @@ def write_dashboard(events, notam_list=None):
     data = [{"title": ev["analysis"].get("titular") or ev["items"][0]["title"], "link": ev["items"][0]["link"],
              "source": ev["items"][0]["source"], "n": len({i["source"] for i in ev["items"]}),
              "cat": ev["analysis"]["categoria"], "sev": ev["analysis"]["severidad"],
-             "impact": ev["analysis"]["impact_score"], "puj": bool(ev["analysis"].get("affects_puj")),
+             # puj = mención DIRECTA del hub (badge y vista "Hub PUJ"); el criterio amplio
+             # affects_puj (aerolíneas con operación en PUJ) queda para alertas/BD/API.
+             "impact": ev["analysis"]["impact_score"], "puj": bool(ev["analysis"].get("puj_direct")),
+             "dr": ev["analysis"].get("dr_tier"),   # 'core' = RD · 'regional' = Caribe · null = global
              "why": ev["analysis"]["angulo_editorial"], "resumen": ev["analysis"].get("resumen", ""),
              "fecha": human_age(ev.get("dt")), "img": ev.get("image_url"),
              # iso = publicación en UTC marcada con 'Z' → el navegador calcula la antigüedad EN VIVO
@@ -890,15 +1009,18 @@ def main():
     mode = f"LLM · {prov}" if prov else "heurística (sin API key)"
     print(f"AeroIntel · MVP Fase 1 · {datetime.now():%Y-%m-%d %H:%M} · análisis: {mode}\n")
 
-    items = []
+    items, src_health = [], []
     for s in SOURCES:
         url = gnews_url(s) if s["type"] == "gnews" else s["url"]
         try:
             got = parse_feed(fetch(url), s["name"])
             print(f"  ✓ {s['name']}: {len(got)} ítems")
             items += got
+            src_health.append({"name": s["name"], "ok": True, "items": len(got), "error": None})
         except Exception as e:
-            print(f"  ✗ {s['name']}: {type(e).__name__}: {e}")
+            err = f"{type(e).__name__}: {e}"
+            print(f"  ✗ {s['name']}: {err}")
+            src_health.append({"name": s["name"], "ok": False, "items": 0, "error": err})
 
     before = len(items)
     items = [it for it in items if (age_hours(it.get("dt")) or 0) <= MAX_AGE_H]   # solo noticias recientes
@@ -938,6 +1060,7 @@ def main():
     n_img = int(os.environ.get("AEROINTEL_IMG_N", "48"))
     if os.environ.get("AEROINTEL_NO_IMG", "").lower() not in ("1", "true", "yes"):
         fetch_images_parallel(events, n=n_img)
+        apply_image_boost(events)          # nota con foto real sube un poco (solo reordena)
 
     # 4b) NOTAMs activos de la estación (MDPC). Server-side; sin clave/sin suscripción → [] y se omite.
     notam_list, notam_err = notams.fetch_notams()
@@ -993,6 +1116,24 @@ def main():
         print("  → publicados en Mattermost ✓")
     else:
         print("  → DRY-RUN (no se publicó nada). Define MATTERMOST_WEBHOOK_URL para enviar de verdad.")
+
+    # Salud de la corrida: aviso solo si algo falló (fuente caída / NOTAM con clave / LLM degradado).
+    src_fails = [h for h in src_health if not h["ok"]]
+    notam_alert = notam_err if (notam_err and "sin clave" not in notam_err) else None
+    if src_fails or notam_alert or _LLM_STATS["fallbacks"]:
+        resumen = (f"⚠ salud: {len(src_fails)} fuente(s) caída(s)"
+                   + (f" · NOTAM: {notam_alert}" if notam_alert else "")
+                   + (f" · LLM→heurística: {_LLM_STATS['fallbacks']}" if _LLM_STATS["fallbacks"] else "")
+                   + (f" · reintentos LLM: {_LLM_STATS['retries']}" if _LLM_STATS["retries"] else ""))
+        print(f"  {resumen}")
+        if hook:
+            try:
+                post(hook, health_payload(src_fails, len(SOURCES), notam_alert, _LLM_STATS["fallbacks"]))
+                print("  → aviso de salud publicado en Mattermost ✓")
+            except Exception as e:
+                print(f"  ⚠ no se pudo publicar el aviso de salud ({type(e).__name__}: {e})")
+    else:
+        print("  ✓ salud: todas las fuentes respondieron.")
     print("  → output/dashboard.html  (panel web)")
     print("  → output/mattermost_payloads.json  (lo que se enviaría)")
     print("  → output/briefing.md  (resumen diario)")
