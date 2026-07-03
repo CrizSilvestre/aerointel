@@ -235,6 +235,17 @@ try:
 finally:
     A.analyze = _real_analyze
 
+# ── METAR server-side → /api/weather.json (fetch simulado, sin red) ──
+_real_fetch = A.fetch
+A.fetch = lambda url, timeout=15: b'[{"temp": 28.0, "wdir": 90, "wspd": 12, "rawOb": "MDPC 021800Z 09012KT"}]'
+wx = A.fetch_weather()
+ok("weather · estructura correcta", wx["station"] == "MDPC" and wx["metar"]["temp"] == 28.0 and bool(wx["fetched_at"]))
+def _fetch_boom(url, timeout=15):
+    raise OSError("red caída")
+A.fetch = _fetch_boom
+ok("weather · fallo devuelve None (dashboard usa Open-Meteo)", A.fetch_weather() is None)
+A.fetch = _real_fetch
+
 # ── Monitor de salud: payload para Mattermost ──
 hp = A.health_payload([{"name": "Fuente X", "ok": False, "items": 0, "error": "HTTPError: 503"}],
                       21, notam_err="HTTP 429 rate limit", llm_fallbacks=2)

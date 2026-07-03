@@ -1537,22 +1537,24 @@
           });
       }
 
-      // Primario: METAR real desde aviationweather.gov (datos observados del aeródromo MDPC)
-      fetch('https://aviationweather.gov/api/data/metar?ids=MDPC&format=json')
+      // Primario: METAR real de MDPC publicado por el PIPELINE en api/weather.json (mismo origen).
+      // aviationweather.gov bloquea CORS desde el navegador; el servidor lo trae cada corrida
+      // (el METAR se emite cada hora → el cron de 30 min lo mantiene fresco).
+      fetch('api/weather.json')
         .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-        .then(arr => {
-          if (!arr || !arr.length) throw new Error('empty');
-          const m = arr[0];
+        .then(d => {
+          const m = d && d.metar;
+          const fresh = d && d.fetched_at && (Date.now() - Date.parse(d.fetched_at)) < 3 * 3.6e6;
+          if (!m || !fresh || m.temp == null) throw new Error('METAR ausente o viejo');
           const isDay = isDayPUJ();
           const [ico, cond] = metarCondition(m.wxString, m.clouds, isDay);
-          const tempC = Math.round(m.temp);
-          renderWx(tempC, m.wdir, m.wspd, ico, cond);
+          renderWx(Math.round(m.temp), m.wdir, m.wspd, ico, cond);
           // Tooltip con el METAR crudo para referencia
           const pill = document.querySelector('.wx-pill');
           if (pill && m.rawOb) pill.title = 'METAR: ' + m.rawOb;
         })
         .catch(() => {
-          // Si METAR falla, usar Open-Meteo como respaldo
+          // Si el METAR del pipeline falta o está viejo → Open-Meteo en vivo (sí permite CORS)
           fetchOpenMeteo().catch(() => {
             document.getElementById('wx-cond').textContent = 'Sin datos';
             document.getElementById('wx-ico').textContent = '✈️';

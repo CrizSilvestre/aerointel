@@ -957,6 +957,22 @@ def to_mattermost(ev):
                              "footer": f"Fuentes: {sources} · {len(ev['items'])} fuente(s) · {datetime.now():%d %b %Y %H:%M}",
                              "actions": [{"type": "button", "name": "Ver fuente", "url": first["link"]}]}]}
 
+# ── METAR de la estación, traído SERVER-SIDE. aviationweather.gov dejó de permitir CORS en el
+#    navegador; el pipeline lo obtiene cada corrida (el METAR se emite cada hora → cron de 30 min
+#    lo mantiene fresco) y lo publica en /api/weather.json para lectura mismo-origen. ──
+def fetch_weather(icao="MDPC"):
+    """Devuelve {"fetched_at", "station", "metar": <objeto aviationweather>} o None si falla."""
+    try:
+        raw = json.loads(fetch(f"https://aviationweather.gov/api/data/metar?ids={icao}&format=json",
+                               timeout=15))
+        if raw:
+            return {"fetched_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                    "station": icao, "metar": raw[0]}
+        print(f"  ⚠ METAR ({icao}): respuesta vacía — el dashboard usará Open-Meteo en vivo")
+    except Exception as e:
+        print(f"  ⚠ METAR ({icao}): {type(e).__name__}: {e} — el dashboard usará Open-Meteo en vivo")
+    return None
+
 # ── Monitor de salud: aviso a Mattermost el DÍA que algo falle (fuente caída, NOTAM, LLM
 #    degradado), no semanas después. Solo se envía si hay algo que reportar. ──
 def health_payload(fails, total_sources, notam_err=None, llm_fallbacks=0):
@@ -1111,6 +1127,16 @@ def main():
             done = interpret_notams_llm(notam_list, prov, cap=notam_cap)
             if done:
                 print(f"  NOTAM · IA interpretó {done}/{len(notam_list)} (resto: lectura heurística)")
+
+    # 4c) METAR server-side → /api/weather.json (el navegador ya no puede llamar a
+    # aviationweather.gov por CORS; mismo-origen no tiene ese problema).
+    wx = fetch_weather()
+    api_dir = os.path.join(OUT, "api")
+    os.makedirs(api_dir, exist_ok=True)
+    json.dump(wx or {"fetched_at": None, "station": None, "metar": None},
+              open(os.path.join(api_dir, "weather.json"), "w", encoding="utf-8"), ensure_ascii=False)
+    if wx:
+        print(f"  METAR ({wx['station']}): {str(wx['metar'].get('rawOb', ''))[:70]}")
 
     json.dump([to_mattermost(ev) for ev in events],
               open(os.path.join(OUT, "mattermost_payloads.json"), "w", encoding="utf-8"),
