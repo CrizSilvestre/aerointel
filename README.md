@@ -48,8 +48,8 @@ Decisión deliberada: un **motor de generación estática** (Python de librería
 | `api_server/` | **API REST en vivo OPCIONAL** (FastAPI sobre la misma BD). La producción no la necesita. |
 | `sources.json` | Allowlist de fuentes (Google News por consulta + RSS directos). |
 | `airlines_puj.json` | Aerolíneas con operación en PUJ (relevancia/impacto). |
-| `tests/test_pipeline.py` | Suite sin red (40+ asserts): relevancia, scoring, imágenes, BD, API. |
-| `.github/workflows/update.yml` | Cron horario: corre tests + pipeline y despliega a Pages. |
+| `tests/test_pipeline.py` | Suite sin red (100+ asserts): relevancia, scoring, resiliencia, BD, API. |
+| `.github/workflows/update.yml` | Cron cada 30 min: corre tests + pipeline y despliega a Pages. |
 
 ¿Por qué **no** Postgres + React + servidor FastAPI como stack principal? Porque añadirían hosting,
 una BD gestionada y mantenimiento de uptime — fragilidad y costo contra las prioridades
@@ -82,8 +82,8 @@ sin servidor; el FastAPI queda como módulo aditivo para quien quiera consultas 
    **mención directa** del aeropuerto (`puj_direct`: Punta Cana / PUJ / MDPC) — el criterio amplio
    `affects_puj` (aerolíneas con operación en PUJ) se mantiene para alertas y API.
 
-4. **Actualización automática.** GitHub Actions cron **cada hora**: corre los tests, ejecuta el
-   pipeline y **despliega a GitHub Pages**. El usuario abre la página y ya está al día. Ver más abajo.
+4. **Actualización automática.** GitHub Actions cron **cada 30 minutos**: corre los tests, ejecuta
+   el pipeline y **despliega a GitHub Pages**. El usuario abre la página y ya está al día. Ver más abajo.
 
 ---
 
@@ -167,8 +167,8 @@ críticas U/S) y **estado** (vigente/programado), con la vigencia en **hora loca
 1. Sube el repo a GitHub.
 2. **Settings → Secrets and variables → Actions** → `GROQ_API_KEY` (y opcional `MATTERMOST_WEBHOOK_URL`).
 3. **Settings → Pages → Source: GitHub Actions.**
-4. El workflow `update.yml` corre **cada hora** (y a mano con *Run workflow*): tests → pipeline →
-   deploy. La portada queda en la URL de Pages.
+4. El workflow `update.yml` corre **cada 30 minutos** (y a mano con *Run workflow*): tests →
+   pipeline → deploy. La portada queda en la URL de Pages.
 
 > La BD SQLite en Actions es efímera (se regenera cada corrida); el historial de largo plazo vive
 > donde se persista la BD (ejecución local o un runner con almacenamiento).
@@ -222,6 +222,7 @@ fetch del `latest.json`). Así se respeta la separación limpia sin acoplar desp
 
 ## Pruebas
 
-`python3 tests/test_pipeline.py` — 40+ asserts sin red: matching de aerolíneas, relevancia (incl.
-regresión del bug `jet`/`objetivo`), niveles geográficos, ajustes de ranking (ruido/recap/piso RD),
-extracción de imagen, limpieza de titulares, y el ciclo SQLite + API estática.
+`python3 tests/test_pipeline.py` — 100+ asserts sin red: matching de aerolíneas, relevancia (incl.
+regresiones `jet`/`objetivo` y `jac`/`hijack`), niveles geográficos, ajustes de ranking (ruido/
+recap/piso RD/pronóstico rutinario), boost de imagen, resiliencia LLM (retry/backoff/cortacircuito
+con red simulada), monitor de salud, METAR server-side, NOTAMs, y el ciclo SQLite + API estática.
