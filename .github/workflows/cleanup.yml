@@ -1,0 +1,34 @@
+name: Limpieza de historial
+
+# Borra las corridas de Actions con más de RETENTION_DAYS días (el cron cada 30 min genera
+# ~1,400 entradas/mes y el historial no expira solo — solo sus logs). 14 días de ventana
+# bastan para investigar cualquier incidente del monitor de salud. El número de corrida
+# (#114, #115…) es un contador que nunca se reinicia; que crezca es normal e inofensivo.
+on:
+  schedule:
+    - cron: "23 5 * * *"          # diario 05:23 UTC (minuto impar: esquiva la estampida)
+  workflow_dispatch: {}            # y a mano desde la pestaña Actions
+
+permissions:
+  actions: write                   # necesario para borrar corridas
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    env:
+      RETENTION_DAYS: "14"
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Borrar corridas viejas
+        run: |
+          cutoff=$(date -u -d "${RETENTION_DAYS} days ago" +%Y-%m-%dT%H:%M:%SZ)
+          echo "Borrando corridas creadas antes de ${cutoff}…"
+          deleted=0
+          # El filtro created=<fecha lo aplica el propio API; --paginate recorre todas las páginas.
+          for id in $(gh api "repos/${{ github.repository }}/actions/runs?per_page=100&created=%3C${cutoff}" \
+                        --paginate --jq '.workflow_runs[].id'); do
+            if gh api -X DELETE "repos/${{ github.repository }}/actions/runs/${id}" >/dev/null 2>&1; then
+              deleted=$((deleted+1))
+            fi
+          done
+          echo "✓ ${deleted} corrida(s) eliminadas. Historial acotado a ~${RETENTION_DAYS} días."
