@@ -1,0 +1,7 @@
+{
+  "_comment": "Aeropuertos de EE.UU. con servicio directo a PUJ. EDITABLE por operaciones: las rutas cambian por temporada — este archivo es la fuente de verdad de la marca 'Ruta PUJ' en la sección NAS. Códigos IATA en mayúsculas.",
+  "airports": [
+    "ATL", "BOS", "BWI", "CLT", "DFW", "DTW", "EWR", "FLL", "HOU",
+    "IAD", "IAH", "JFK", "MCO", "MIA", "MSP", "ORD", "PHL"
+  ]
+}

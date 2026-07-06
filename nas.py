@@ -4,7 +4,7 @@
 # moderno que alimenta esa página). Un ground stop en MIA/JFK/FLL cascadea directo a los
 # itinerarios de PUJ — por eso es una categoría operativa, no una curiosidad.
 # Solo librería estándar. Si el API falla → ([], err) y la sección no aparece (degradación).
-import os, re, ssl, urllib.request
+import os, re, ssl, json, urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 
@@ -12,13 +12,28 @@ NAS_URL = "https://nasstatus.faa.gov/api/airport-status-information"
 SOURCE_NAME = "FAA · NAS Status"
 SOURCE_URL = "https://nasstatus.faa.gov/"
 
-# Aeropuertos de EE.UU. con servicio directo / relevancia de red hacia PUJ. Un evento aquí
-# se marca "Ruta PUJ" y sube al tope de la lista.
-PUJ_US_AIRPORTS = {
-    "MIA", "FLL", "MCO", "TPA", "PBI", "JFK", "LGA", "EWR", "SWF", "BOS", "PHL", "BWI",
-    "IAD", "DCA", "ATL", "CLT", "ORD", "MDW", "DFW", "IAH", "MSP", "DTW", "STL", "PIT",
-    "CVG", "CMH", "IND", "BNA", "RDU", "SJU",
+_HERE = os.path.dirname(os.path.abspath(__file__))
+
+# Respaldo embebido: aeropuertos de EE.UU. con servicio directo a PUJ. La fuente de verdad
+# EDITABLE es nas_puj_airports.json (operaciones lo mantiene por temporada). OJO: LGA y DCA
+# tienen regla de perímetro — no pueden operar a PUJ; no agregarlos.
+_DEFAULT_PUJ_US = {
+    "ATL", "BOS", "BWI", "CLT", "DFW", "DTW", "EWR", "FLL", "HOU",
+    "IAD", "IAH", "JFK", "MCO", "MIA", "MSP", "ORD", "PHL",
 }
+
+def _load_puj_airports():
+    """Carga la lista editable (nas_puj_airports.json); si falta o está rota, usa el respaldo."""
+    try:
+        with open(os.path.join(_HERE, "nas_puj_airports.json"), encoding="utf-8") as f:
+            aps = {str(a).strip().upper() for a in json.load(f).get("airports", []) if str(a).strip()}
+        if aps:
+            return aps
+    except Exception:
+        pass
+    return set(_DEFAULT_PUJ_US)
+
+PUJ_US_AIRPORTS = _load_puj_airports()
 
 # Traducción best-effort de las causas de la FAA (texto libre; lo no mapeado queda crudo).
 _REASON_ES = [

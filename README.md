@@ -169,7 +169,9 @@ críticas U/S) y **estado** (vigente/programado), con la vigencia en **hora loca
 Sección **NAS EE.UU.** con los **ground stops, programas de demora y cierres activos** del
 sistema estadounidense, vía el API oficial de la FAA (`nasstatus.faa.gov`). Un ground stop en
 MIA/JFK/FLL cascadea directo a los itinerarios de PUJ: los eventos en aeropuertos con servicio
-a Punta Cana se marcan **Ruta PUJ** y encabezan la lista (`nas.py` · `PUJ_US_AIRPORTS`).
+a Punta Cana se marcan **Ruta PUJ** y encabezan la lista. La lista de estaciones es **editable
+por operaciones** en `nas_puj_airports.json` (las rutas cambian por temporada; LGA/DCA nunca —
+regla de perímetro).
 Causas traducidas al español; cierres solo-aviación general se etiquetan aparte (no afectan
 la operación comercial). Sin clave ni registro; si el API falla, la sección no aparece.
 `AEROINTEL_NAS_DEMO=1` para previsualizar con datos de ejemplo.

@@ -194,11 +194,23 @@ def _demo_raw():
     ]
 
 
+# Un NOTAM de reemplazo (NOTAMR) o cancelación (NOTAMC) referencia al que sustituye. Si el
+# proveedor sigue listando el viejo junto a su sustituto, aquí se elimina el viejo.
+_REPL_RE = re.compile(r"NOTAM[RC]\s+([A-Z]?\d{1,4}/\d{2,4})")
+
+def drop_replaced(items):
+    dead = set()
+    for n in items:
+        for m in _REPL_RE.finditer((n.get("raw") or "") + " " + (n.get("body") or "")):
+            dead.add(m.group(1))
+    return [n for n in items if n["id"] not in dead]
+
+
 def fetch_notams(icao=ICAO_DEFAULT, key=None, timeout=25):
     """Devuelve (lista_normalizada, error|None). Lista vacía si no hay clave o falla el API."""
     if os.environ.get("AEROINTEL_NOTAM_DEMO", "").lower() in ("1", "true", "yes"):
         out = [normalize(n) for n in _demo_raw()]
-        out = [n for n in out if n["status"] != "expirado"]
+        out = drop_replaced([n for n in out if n["status"] != "expirado"])
         rank, sstat = {"alta": 0, "media": 1}, {"vigente": 0, "programado": 1}
         out.sort(key=lambda n: (rank.get(n["importance"], 2), sstat.get(n["status"], 2), n["effective"] or ""))
         return out, None
@@ -222,6 +234,7 @@ def fetch_notams(icao=ICAO_DEFAULT, key=None, timeout=25):
     items = raw.get("notams") or []
     out = [normalize(n) for n in items]
     out = [n for n in out if n["status"] != "expirado"]            # solo activos/programados
+    out = drop_replaced(out)                                       # sin reemplazados/cancelados
     rank = {"alta": 0, "media": 1}
     sstat = {"vigente": 0, "programado": 1}
     out.sort(key=lambda n: (rank.get(n["importance"], 2), sstat.get(n["status"], 2), n["effective"] or ""))

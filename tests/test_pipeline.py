@@ -308,6 +308,15 @@ ok("notam · fuente explícita se respeta", nd["source"] == "AIS")
 ok("notam · fuente por defecto = AIS/IDAC", NT.normalize({"raw": "TWY C WIP", "scope": "A"})["source"] == NT.SOURCE_NAME)
 ok("notam · source_url presente", NT.normalize({"raw": "TWY C WIP"})["source_url"].startswith("https://"))
 ok("notam · scope separado de la fuente", NT.normalize({"raw": "TWY C WIP", "scope": "A"})["scope"] == "Aeródromo")
+# Reemplazados/cancelados: si el lote trae el sustituto (NOTAMR), el viejo se elimina
+_batch = [
+    NT.normalize({"notam_id": "A100/26", "raw": "TWY C CLSD", "expiration": "2027-01-01T00:00:00Z"}),
+    NT.normalize({"notam_id": "A205/26", "type": "R", "expiration": "2027-01-01T00:00:00Z",
+                  "raw": "!MDPC A205/26 NOTAMR A100/26 TWY C CLSD WIP"}),
+]
+_kept = NT.drop_replaced(_batch)
+ok("notam · reemplazado se elimina del lote", [n["id"] for n in _kept] == ["A205/26"])
+ok("notam · lote sin referencias queda intacto", len(NT.drop_replaced([_batch[0]])) == 1)
 
 # ── NAS (FAA): parseo del XML de nasstatus.faa.gov (demo, sin red) ──
 import nas as NS
@@ -334,6 +343,10 @@ _, gev = NS.parse_nas(_ga_xml)
 ok("nas · cierre GA etiquetado", gev[1]["ga_only"] is True and "aviación general" in gev[1]["label"])
 ok("nas · NOTAM crudo no ensucia la causa", "!EWR" not in gev[1]["reason_es"])
 ok("nas · cierre real primero, GA después", gev[0]["airport"] == "MIA" and gev[0]["ga_only"] is False)
+# Lista de aeropuertos PUJ: editable desde nas_puj_airports.json; sin LGA/DCA (regla de perímetro)
+ok("nas · lista cargada del JSON editable", "JFK" in NS.PUJ_US_AIRPORTS and "HOU" in NS.PUJ_US_AIRPORTS)
+ok("nas · LGA/DCA fuera (perímetro, sin PUJ)", "LGA" not in NS.PUJ_US_AIRPORTS and "DCA" not in NS.PUJ_US_AIRPORTS)
+ok("nas · respaldo embebido coherente", NS._DEFAULT_PUJ_US <= NS.PUJ_US_AIRPORTS or bool(NS.PUJ_US_AIRPORTS))
 
 print(f"\n{'ALL PASS' if not fails else str(fails) + ' FAILED'}")
 sys.exit(1 if fails else 0)

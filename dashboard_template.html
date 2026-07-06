@@ -1387,7 +1387,11 @@
 
   <script>
     const EVENTS = /*DATA*/;
-    const NOTAMS = /*NOTAMS*/;   // NOTAMs activos de MDPC (vacío si no hay clave/suscripción → no se muestra)
+    // NOTAMs activos de MDPC (vacío si no hay clave/suscripción → no se muestra). El filtro de
+    // vencidos corre TAMBIÉN aquí: si un NOTAM expira entre corridas del pipeline (el cron puede
+    // espaciarse), desaparece de la vista al instante sin esperar el próximo build.
+    const NOTAMS = (/*NOTAMS*/).filter(n =>
+      n.permanent || !n.expiration || Date.parse(n.expiration) > Date.now());
     const NAS = /*NAS*/;         // Estado del NAS (FAA): ground stops/demoras en EE.UU. (vacío → no se muestra)
     const CAT = {
       meteo: { label: 'Clima', g: ['#0e7c5a', '#0a5e44'] },
@@ -1771,7 +1775,10 @@
     }
     function notamCard(n) {
       const imp = n.importance === 'alta';
-      const statusES = { vigente: 'Vigente', programado: 'Programado' }[n.status] || n.status;
+      // Estado recalculado EN VIVO (no el del build): un 'programado' cuya vigencia ya empezó
+      // se muestra 'Vigente' aunque el pipeline no haya vuelto a correr.
+      const liveStatus = (n.effective && Date.parse(n.effective) > Date.now()) ? 'programado' : 'vigente';
+      const statusES = { vigente: 'Vigente', programado: 'Programado' }[liveStatus];
       const eff = rdShort(n.effective), exp = rdShort(n.expiration);
       const sched = n.permanent ? (eff ? `Permanente · desde ${eff}` : 'Permanente')
         : (exp ? `${eff || '—'} → ${exp}` : (eff ? `desde ${eff}` : '—'));
@@ -1779,7 +1786,7 @@
         <div class="ntop">
           <span class="nid">${esc(n.id)}</span>
           <span class="nsub">${esc(n.subject)}</span>
-          <span class="nstat ${n.status}">${statusES}</span>
+          <span class="nstat ${liveStatus}">${statusES}</span>
           ${imp ? '<span class="nhigh">Alta</span>' : ''}
         </div>
         <div class="nsched">Vigencia: <b>${sched}</b> (hora RD)${n.tipo ? ` · ${esc(n.tipo)}` : ''}</div>
@@ -1799,7 +1806,7 @@
       </div>` : '';
       return `<div class="section">
         <div class="section-h"><span class="t">NOTAM · MDPC (Punta Cana)</span><span class="rule"></span></div>
-        <div class="notam-note">Avisos a la navegación aérea vigentes y programados en la estación · <b>${NOTAMS.length}</b> activos${high ? ` · <b style="color:var(--crit)">${high} de alta importancia</b>` : ''}.
+        <div class="notam-note">Avisos a la navegación aérea vigentes y programados en la estación · <b>${NOTAMS.length}</b> activos${high ? ` · <b style="color:var(--crit)">${high} de alta importancia</b>` : ''} · datos obtenidos ${agoText(BUILD_ISO)}.
         <span class="notam-disc">Operativo y referencial — la fuente oficial es AIS/IDAC.</span></div>
         ${sumChips}
         <div class="notam-grid">${cards}</div>
