@@ -39,17 +39,29 @@ Decisión deliberada: un **motor de generación estática** (Python de librería
 
 ### Componentes
 
-| Archivo | Rol |
+Código dividido por responsabilidad — **para editar algo, este es el mapa**:
+
+| Archivo | Qué tocar ahí |
 |---|---|
-| `aerointel.py` | Motor: ingesta → relevancia → dedup → scoring → LLM → imágenes → render. Solo stdlib. |
-| `store.py` | Persistencia SQLite: artículos, scores, resúmenes, imágenes, **historial** y analítica. |
-| `apiexport.py` | Exporta la **API estática JSON** (`/api/news/*`, `/api/analytics`). |
-| `dashboard_template.html` | Periódico web (serif, fichas de inteligencia, sin emojis). |
-| `api_server/` | **API REST en vivo OPCIONAL** (FastAPI sobre la misma BD). La producción no la necesita. |
-| `sources.json` | Allowlist de fuentes (Google News por consulta + RSS directos). |
-| `airlines_puj.json` | Aerolíneas con operación en PUJ (relevancia/impacto). |
-| `tests/test_pipeline.py` | Suite sin red (100+ asserts): relevancia, scoring, resiliencia, BD, API. |
-| `.github/workflows/update.yml` | Cron cada 30 min: corre tests + pipeline y despliega a Pages. |
+| `aerointel.py` | Solo el **orquestador** (`main()`): el orden del pipeline. |
+| `config.py` | Rutas, user-agents, carga de JSON. |
+| `ingesta.py` | Descarga/parseo de feeds, fechas, limpieza de titulares, dedup/cluster. |
+| `relevancia.py` | **Keywords por categoría**, severidad, aerolíneas, niveles RD, filtros de ruido. |
+| `analisis.py` | El **"porqué"** (editorial heurístico), pesos del score, ajustes de ranking. |
+| `ia.py` | **Prompts del LLM**, proveedores, reintentos/cortacircuito, lectura de NOTAMs. |
+| `imagenes.py` | og:image, filtros anti-placeholder, boost de foto. |
+| `clima.py` | METAR server-side (`/api/weather.json`). |
+| `notams.py` | NOTAMs de MDPC (SkyLink): clasificación y lectura operativa. |
+| `nas.py` | Estado del NAS de la FAA (ground stops EE.UU., marca "Ruta PUJ"). |
+| `salida.py` | Dashboard, Mattermost (breaking + salud), briefing. |
+| `store.py` | Persistencia SQLite: artículos, historial y analítica. |
+| `apiexport.py` | API estática JSON (`/api/news/*`, `/api/analytics`). |
+| `dashboard_template.html` | La web en sí (HTML/CSS/JS del periódico). |
+| `api_server/` | API REST en vivo OPCIONAL (FastAPI). La producción no la necesita. |
+
+Config editable **sin tocar código**: `sources.json` (fuentes), `airlines_puj.json` (aerolíneas
+PUJ), `nas_puj_airports.json` (aeropuertos EE.UU. con ruta a PUJ).
+Suite: `tests/test_pipeline.py` (130+ asserts sin red) · Cron: `.github/workflows/update.yml`.
 
 ¿Por qué **no** Postgres + React + servidor FastAPI como stack principal? Porque añadirían hosting,
 una BD gestionada y mantenimiento de uptime — fragilidad y costo contra las prioridades
