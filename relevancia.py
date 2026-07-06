@@ -186,7 +186,8 @@ def dr_tier(text):
 PUJ_DIRECT_RE = re.compile(r"(?i:punta\s?cana)|\bPUJ\b|\bMDPC\b")
 
 RECAP_RE = re.compile(r"\b(recap|roundup|round-up|explained|timeline|what we know|in photos|"
-                      r"cronolog|resumen del|a look back|year in review)\b", re.I)
+                      r"cronolog|resumen del|a look back|year in review|"
+                      r"new book|nuevo libro|book examines|book review|memoir|documentary|documental)\b", re.I)
 
 # Contenido RUTINARIO / NO OPERACIONAL: pronóstico diario (temperatura/probabilidad de lluvia)
 # y noticias de asistencia social post-evento (bonos, subsidios). Se hunden bajo el umbral;

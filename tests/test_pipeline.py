@@ -110,6 +110,9 @@ ok("ajuste · piso RD eleva nota operacional", floor["analysis"]["impact_score"]
 ok("ajuste · piso RD marca affects_puj", floor["analysis"]["affects_puj"] is True)
 recap = AN.apply_ranking_adjustments(mkev("Timeline: what we know about the crash", sev="crítico", cat="seguridad", tier=None, impact=70))
 ok("ajuste · recap baja severidad", recap["analysis"]["severidad"] != "crítico")
+# Reseña de libro/documental sobre eventos pasados: contenido editorial, no inteligencia operativa
+book = AN.apply_ranking_adjustments(mkev("New book examines legal dispute that halted Bávaro International Airport", cat="industria", impact=74))
+ok("ajuste · reseña de libro se hunde", book["analysis"]["impact_score"] <= 54)
 # dr_tier faltante (ruta LLM: el modelo no lo devuelve) → se fija determinista desde el texto
 llmev = mkev("Arajet suspende ruta desde Punta Cana", impact=60)
 del llmev["analysis"]["dr_tier"]

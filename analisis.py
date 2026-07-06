@@ -338,11 +338,13 @@ def apply_ranking_adjustments(ev):
         a["impact_score"] = min(a["impact_score"], 24)
         a["severidad"] = "info"
         is_noise = True                              # tampoco aplica el piso RD
-    # Recap/cronología de evento ya ocurrido: no es breaking
+    # Recap/cronología/reseña de evento ya ocurrido: no es breaking — y tampoco merece el
+    # piso RD (un libro sobre un aeropuerto de RD sigue siendo contenido editorial, no operativo).
     if RECAP_RE.search(ev["items"][0]["title"]):
         a["impact_score"] -= 20
         if a["severidad"] == "crítico":
             a["severidad"] = "importante"
+        is_noise = True
     # Historia de recuperación (rebote/reapertura tras un evento): nombrar al huracán no la hace
     # crítica. Sin señales de amenaza vigente → severidad informativa y sin ticker de última hora.
     if WX_RECOVERY_RE.search(txt) and not WX_ACTIVE_RE.search(txt) and a["severidad"] == "crítico":
