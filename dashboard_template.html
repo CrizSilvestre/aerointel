@@ -270,13 +270,30 @@
       border: 0;
       background: transparent;
       color: #cdd7ea;
-      font-size: 12.5px;
+      font-size: 12px;
       font-weight: 600;
-      padding: 11px 13px;
+      padding: 11px 10px;
       cursor: pointer;
-      letter-spacing: .3px;
+      letter-spacing: .2px;
       flex: 0 0 auto;
       white-space: nowrap;
+    }
+
+    /* Indicador de desborde: cuando hay más pestañas ocultas, el borde se desvanece —
+       el corte se lee como "desliza para ver más", no como un botón roto. */
+    nav.sections.fade-r {
+      -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 36px), transparent);
+      mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 36px), transparent);
+    }
+
+    nav.sections.fade-l {
+      -webkit-mask-image: linear-gradient(90deg, transparent, #000 36px, #000 100%);
+      mask-image: linear-gradient(90deg, transparent, #000 36px, #000 100%);
+    }
+
+    nav.sections.fade-l.fade-r {
+      -webkit-mask-image: linear-gradient(90deg, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+      mask-image: linear-gradient(90deg, transparent, #000 36px, #000 calc(100% - 36px), transparent);
     }
 
     nav.sections button:hover {
@@ -1651,6 +1668,15 @@
       const b = document.createElement('button'); b.textContent = l; b.dataset.k = k;
       b.onclick = () => { view = k; render(); window.scrollTo(0, 0); }; nav.appendChild(b);
     });
+    // Indicador de desborde del nav: desvanece el borde por donde hay pestañas ocultas.
+    function navFade() {
+      nav.classList.toggle('fade-l', nav.scrollLeft > 4);
+      nav.classList.toggle('fade-r', nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 4);
+    }
+    nav.addEventListener('scroll', navFade, { passive: true });
+    window.addEventListener('resize', navFade);
+    setInterval(navFade, 800);   // respaldo: garantiza el indicador aunque algún evento se pierda
+    navFade();
 
     const sevName = s => s === 'crítico' ? 'Última hora' : s === 'importante' ? 'Actualización' : 'Info';
     function badges(e) { return `<span class="sev ${e.sev}">${sevName(e.sev)}</span>${e.puj ? '<span class="pujtag">PUJ</span>' : ''}`; }

@@ -4,9 +4,10 @@ name: AeroIntel update
 # GitHub Pages (y publica lo crítico a Mattermost si está configurado).
 on:
   schedule:
-    # Cada 30 min: equilibra frescura (GitHub a veces salta corridas) con el presupuesto del
-    # free tier de Groq. Repo público = minutos de Actions gratis.
-    - cron: "*/30 * * * *"
+    # Cada 30 min, en los minutos 7 y 37: los minutos 0/30 son los más congestionados de
+    # GitHub Actions y ahí es donde más corridas programadas se descartan (vimos huecos de
+    # hasta 4 h de madrugada). Correr fuera de la estampida reduce los saltos.
+    - cron: "7,37 * * * *"
   workflow_dispatch: {}          # permite correrlo a mano desde Actions
 
 permissions:
