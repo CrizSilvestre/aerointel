@@ -258,7 +258,8 @@ def cluster(items):
 # ───────────────────────── relevancia / clasificación (heurística) ─────────────────────────
 KW = {
     "rutas":       ["new route", "new service", "launches", "primer vuelo", "vuelo entre", "nueva ruta",
-                    "frequency", "nonstop", "nueva frecuencia", "inaugura", "conecta", "begins flights", "resumes service"],
+                    "frequency", "nonstop", "nueva frecuencia", "inaugura", "conecta", "begins flights",
+                    "resumes service", "direct flight", "vuelo directo", "nuevo destino"],
     "meteo":       ["hurricane", "tropical storm", "tropical depression", "fog", "turbulence", "blizzard",
                     "tormenta tropical", "huracán", "ciclón", "depresión tropical", "onamet", "nhc",
                     "vaguada", "inundaci", "alerta meteorol", "alerta verde", "alerta amarilla",
@@ -362,6 +363,15 @@ WX_RE = word_re(WX_TERMS)
 # para RD aunque el aviso aún no nombre al Caribe (la trayectoria puede alcanzarlo).
 WX_TROPICAL_RE = word_re(WX_TROPICAL)
 ATLANTIC_RE = re.compile(r"\batl[aá]ntic", re.I)
+# Historia de RECUPERACIÓN tras un evento (rebote, reapertura, normalización): no es una alerta
+# activa aunque nombre al huracán. Solo aplica si el texto NO trae señales de amenaza vigente.
+WX_RECOVERY_RE = re.compile(
+    r"\b(rebound|recover[sy]?|recovery|reabr\w*|recuper\w*|reanud\w*|aftermath|"
+    r"after (?:hurricane|the storm|tropical storm)|tras (?:el|la) (?:hurac[aá]n|tormenta)|"
+    r"se normaliz\w*|restablec\w*|back to normal)\b", re.I)
+WX_ACTIVE_RE = re.compile(
+    r"\b(warning|watch|alert[ae]?|approach\w*|se acerca|amenaza\w*|threatens?|forecast to|"
+    r"expected to (?:strengthen|hit|impact)|en desarrollo|intensific\w*)\b", re.I)
 # Ruido turístico/marketing sin valor operacional → se castiga fuerte y se filtra.
 NOISE_RE = re.compile(
     r"\b(best time to (?:book|visit)|how to (?:book|find|score|visit|travel|get to)|"
@@ -427,13 +437,22 @@ _WX_EVENT_RE = re.compile(
     r'Tropical Storm\s+(?!Warning|Watch|Season)\w+|'
     r'huracán\s+\w+|tormenta tropical\s+(?!en|del|de)\w+|ciclón\s+(?!tropical)\w+)\b', re.I)
 
+# Un lugar precedido por la OFICINA emisora (NWS Miami, National Hurricane Center Miami) no es
+# la zona afectada de la noticia — es la firma del boletín. Se excluye del contexto.
+_ISSUER_RE = re.compile(r"(nws|hurricane center|weather service|centro nacional)\s*$", re.I)
+
 def _extract_context(text):
     """Extrae entidades relevantes del texto para construir un ángulo editorial contextual."""
+    places = []
+    for m in _PLACE_RE.finditer(text):
+        if _ISSUER_RE.search(text[max(0, m.start() - 28):m.start()]):
+            continue
+        places.append(m.group())
     return {
         "airports":  list(dict.fromkeys(_AIRPORTS_RE.findall(text)))[:4],
         "flights":   list(dict.fromkeys(_FLIGHT_RE.findall(text)))[:2],
         "aircraft":  list(dict.fromkeys(_ACFT_RE.findall(text)))[:2],
-        "places":    list(dict.fromkeys(m.group() for m in _PLACE_RE.finditer(text)))[:4],
+        "places":    list(dict.fromkeys(places))[:4],
         "wx_events": list(dict.fromkeys(m.group() for m in _WX_EVENT_RE.finditer(text)))[:2],
     }
 
@@ -476,14 +495,28 @@ def _build_editorial(cat, sev, text, airlines, puj, ctx):
             parts.append(f"aeronave tipo {acft_str}")
         if places_str:
             parts.append(f"ruta asociada: {places_str}")
-        if puj:
-            parts.append("operador(es) con presencia directa en PUJ — monitorear afectación a itinerarios")
+        # Honestidad del vínculo con PUJ: solo se afirma impacto directo si la nota MENCIONA el
+        # hub; una aerolínea que también opera en PUJ es vínculo indirecto y se dice como tal.
+        if PUJ_DIRECT_RE.search(text):
+            parts.append("involucra directamente a PUJ — monitorear afectación a itinerarios")
+        elif airlines:
+            parts.append("aerolínea(s) con operación también en PUJ; monitorear posibles efectos en itinerarios")
+        elif puj:
+            parts.append("ocurre en el entorno RD — relevante para la operación nacional")
         else:
             parts.append("sin impacto directo en PUJ, pero relevante para el sector")
         return "; ".join(parts) + "."
 
     elif cat == "meteo":
         parts = []
+        recovery = WX_RECOVERY_RE.search(tl) and not WX_ACTIVE_RE.search(tl)
+        if recovery:
+            parts.append(f"Recuperación/normalización tras {wx_str}" if wx_str
+                         else "Recuperación tras el evento meteorológico")
+            if places_str:
+                parts.append(f"zona en recuperación: {places_str}")
+            parts.append("sin alerta activa señalada en el texto; valor informativo para la planificación regional")
+            return "; ".join(parts) + "."
         if wx_str:
             parts.append(f"Alerta por {wx_str}")
         else:
@@ -497,16 +530,19 @@ def _build_editorial(cat, sev, text, airlines, puj, ctx):
         return "; ".join(parts) + "."
 
     elif cat == "operaciones":
+        # OJO: "strike" solo es huelga si NO es 'bird/lightning/tail strike' (esos son seguridad);
+        # y el desvío/ground stop se evalúa ANTES para no confundir el evento principal.
+        labor_strike = bool(re.search(r"\bhuelga\b|\bparo\b|(?<!bird )(?<!lightning )(?<!tail )(?<!wildlife )strike\b", tl))
         if any(k in tl for k in ["cancel", "cancela"]):
             event = "cancelaciones"
         elif any(k in tl for k in ["delay", "retraso"]):
             event = "retrasos operativos"
-        elif any(k in tl for k in ["strike", "huelga", "paro"]):
-            event = "huelga/paro laboral"
         elif any(k in tl for k in ["ground stop"]):
             event = "ground stop"
         elif any(k in tl for k in ["divert", "desvi"]):
             event = "desvíos de vuelos"
+        elif labor_strike:
+            event = "huelga/paro laboral"
         else:
             event = "disrupción operativa"
 
@@ -585,9 +621,15 @@ def _build_editorial(cat, sev, text, airlines, puj, ctx):
         return "; ".join(parts) + "."
 
     elif cat == "industria":
-        if any(k in tl for k in ["order", "pedido"]):
+        # "Entrega" solo es entrega de AERONAVE si hay contexto de aeronave (evita confundir
+        # 'entrega de reconocimientos/premios' con un delivery de Airbus/Boeing).
+        acft_ctx = bool(ctx["aircraft"]) or bool(re.search(r"aeronave|aircraft|avi[oó]n|airbus|boeing|embraer|jet\b", tl))
+        if any(k in tl for k in ["visitantes", "turistas", "pasajeros", "passengers", "tourists"]) \
+                and re.search(r"\d[\d.,]*\s*(millones|million|mil\b|%)", tl):
+            parts = ["Cifra de tráfico/demanda del mercado"]
+        elif any(k in tl for k in ["order", "pedido"]) and acft_ctx:
             parts = ["Pedido de aeronaves"]
-        elif any(k in tl for k in ["delivery", "entrega", "receives"]):
+        elif any(k in tl for k in ["delivery", "entrega", "receives"]) and acft_ctx:
             parts = ["Entrega de aeronave"]
         elif any(k in tl for k in ["merger", "fusión", "acquisition", "adquisición"]):
             parts = ["Movimiento corporativo (fusión/adquisición)"]
@@ -724,6 +766,11 @@ def apply_ranking_adjustments(ev):
         a["impact_score"] -= 20
         if a["severidad"] == "crítico":
             a["severidad"] = "importante"
+    # Historia de recuperación (rebote/reapertura tras un evento): nombrar al huracán no la hace
+    # crítica. Sin señales de amenaza vigente → severidad informativa y sin ticker de última hora.
+    if WX_RECOVERY_RE.search(txt) and not WX_ACTIVE_RE.search(txt) and a["severidad"] == "crítico":
+        a["severidad"] = "info"
+        a["impact_score"] -= 10
     # Piso para el núcleo RD: una noticia OPERATIVA de RD nunca debe quedar sepultada.
     # No aplica a ruido turístico/marketing aunque mencione "Punta Cana".
     if not is_noise and a["dr_tier"] == "core" and a["severidad"] != "info":

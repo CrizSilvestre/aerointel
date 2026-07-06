@@ -28,12 +28,10 @@
     body {
       margin: 0;
       background-color: var(--bg);
-      /* textura sutil para las franjas laterales (no compite con el papel blanco encima) */
-      background-image:
-        radial-gradient(rgba(22, 40, 74, .055) 1px, transparent 1.4px),
-        radial-gradient(rgba(22, 40, 74, .04) 1px, transparent 1.4px);
-      background-size: 24px 24px, 24px 24px;
-      background-position: 0 0, 12px 12px;
+      /* Franjas laterales: aviones con estelas punteadas (rutas de vuelo), en tinta navy muy
+         tenue. Se aprecia en los márgenes; el papel blanco del contenido queda limpio encima. */
+      background-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27520%27%20height%3D%27520%27%20viewBox%3D%270%200%20520%20520%27%3E%20%3Cg%20fill%3D%27none%27%20stroke%3D%27rgb%2822%2C40%2C74%29%27%20stroke-linecap%3D%27round%27%3E%20%3Cpath%20d%3D%27M-30%20110%20Q%20260%2030%20550%20150%27%20stroke-width%3D%273%27%20stroke-dasharray%3D%27.1%2013%27%20opacity%3D%27.17%27%2F%3E%20%3Cpath%20d%3D%27M-30%20330%20Q%20210%20420%20550%20280%27%20stroke-width%3D%272.4%27%20stroke-dasharray%3D%27.1%2011%27%20opacity%3D%27.12%27%2F%3E%20%3Cpath%20d%3D%27M170%20-30%20Q%20110%20260%20210%20550%27%20stroke-width%3D%272.7%27%20stroke-dasharray%3D%27.1%2012%27%20opacity%3D%27.145%27%2F%3E%20%3Cpath%20d%3D%27M-30%20480%20Q%20300%20500%20550%20400%27%20stroke-width%3D%272%27%20stroke-dasharray%3D%27.1%2010%27%20opacity%3D%27.09%27%2F%3E%20%3C%2Fg%3E%20%3Cg%20fill%3D%27rgb%2822%2C40%2C74%29%27%3E%20%3Cpath%20d%3D%27M21%2C16v-2l-8-5V3.5C13%2C2.67%2C12.33%2C2%2C11.5%2C2S10%2C2.67%2C10%2C3.5V9l-8%2C5v2l8-2.5V19l-2%2C1.5V22l3.5-1l3.5%2C1v-1.5L13%2C19v-5.5L21%2C16z%27%20opacity%3D%27.22%27%20transform%3D%27translate%28360%2C86%29%20scale%282.1%29%20rotate%28104%2012%2012%29%27%2F%3E%20%3Cpath%20d%3D%27M21%2C16v-2l-8-5V3.5C13%2C2.67%2C12.33%2C2%2C11.5%2C2S10%2C2.67%2C10%2C3.5V9l-8%2C5v2l8-2.5V19l-2%2C1.5V22l3.5-1l3.5%2C1v-1.5L13%2C19v-5.5L21%2C16z%27%20opacity%3D%27.16%27%20transform%3D%27translate%2870%2C300%29%20scale%281.55%29%20rotate%28206%2012%2012%29%27%2F%3E%20%3Cpath%20d%3D%27M21%2C16v-2l-8-5V3.5C13%2C2.67%2C12.33%2C2%2C11.5%2C2S10%2C2.67%2C10%2C3.5V9l-8%2C5v2l8-2.5V19l-2%2C1.5V22l3.5-1l3.5%2C1v-1.5L13%2C19v-5.5L21%2C16z%27%20opacity%3D%27.13%27%20transform%3D%27translate%28196%2C420%29%20scale%281.25%29%20rotate%28168%2012%2012%29%27%2F%3E%20%3Cpath%20d%3D%27M21%2C16v-2l-8-5V3.5C13%2C2.67%2C12.33%2C2%2C11.5%2C2S10%2C2.67%2C10%2C3.5V9l-8%2C5v2l8-2.5V19l-2%2C1.5V22l3.5-1l3.5%2C1v-1.5L13%2C19v-5.5L21%2C16z%27%20opacity%3D%27.17%27%20transform%3D%27translate%28268%2C208%29%20scale%281.0%29%20rotate%2863%2012%2012%29%27%2F%3E%20%3C%2Fg%3E%20%3C%2Fsvg%3E");
+      background-size: 520px 520px;
       color: var(--ink);
       font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
     }
@@ -1273,7 +1271,6 @@
     .notam-sum span { font-size: 11px; font-weight: 700; color: var(--navy2); background: #eef2f9; border: 1px solid var(--line); border-radius: 20px; padding: 3px 11px; }
     .notam-sum span.alta { color: #fff; background: var(--crit); border-color: var(--crit); }
     .notam-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; align-items: start; }
-    @media(min-width:1100px) { .notam-grid { grid-template-columns: repeat(3, 1fr); } }
     .notam-card {
       background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--info);
       border-radius: 8px; padding: 12px 15px;

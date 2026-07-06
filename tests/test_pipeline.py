@@ -161,6 +161,40 @@ ok("api · latest tiene items", latest["count"] == 2 and bool(latest["items"][0]
 ok("api · analytics.json existe", os.path.exists(os.path.join(tmp, "api/analytics.json")))
 conn.close()
 
+# ── Calidad del "porqué" (mismatches vistos en producción, 4 jul 2026) ──
+# 1. 'lightning strike' NO es huelga: el evento correcto es el desvío
+lx = A.analyze_heuristic("Delta flight headed to Atlanta diverted due to potential lightning strike", 1)
+ok("porqué · lightning strike ≠ huelga", "huelga" not in lx["angulo_editorial"].lower())
+ok("porqué · lightning strike = desvío", "desvío" in lx["angulo_editorial"].lower() or "desvi" in lx["angulo_editorial"].lower())
+hs = A.analyze_heuristic("Air Canada workers strike grounds flights at Toronto Pearson", 1)
+ok("porqué · huelga real SÍ se detecta", "huelga" in hs["angulo_editorial"].lower())
+# 2. Historia de recuperación ≠ alerta activa; severidad baja de crítico
+rb = A.analyze_heuristic("Jamaica's Aviation Sector Rebounds After Hurricane Melissa as Government Projects Growth", 1)
+ok("porqué · rebote = recuperación, no alerta", "recuperaci" in rb["angulo_editorial"].lower() and "alerta por" not in rb["angulo_editorial"].lower())
+rbev = A.apply_ranking_adjustments(mkev("Jamaica's Aviation Sector Rebounds After Hurricane Melissa", sev="crítico", cat="meteo", tier=None, impact=60))
+ok("porqué · recuperación no es crítico", rbev["analysis"]["severidad"] == "info")
+act = A.apply_ranking_adjustments(mkev("Hurricane warning as storm approaches Jamaica after hurricane season start", sev="crítico", cat="meteo", tier=None, impact=60))
+ok("porqué · amenaza vigente conserva severidad", act["analysis"]["severidad"] == "crítico")
+# 3. 'entrega' sin contexto de aeronave NO es delivery de avión
+rec = A.analyze_heuristic("El Aeropuerto de Punta Cana entrega reconocimientos a aerolíneas y empresas", 1)
+ok("porqué · entrega de reconocimientos ≠ aeronave", "entrega de aeronave" not in rec["angulo_editorial"].lower())
+dlv = A.analyze_heuristic("Arajet receives delivery of new Boeing 737 MAX aircraft", 1)
+ok("porqué · delivery real de aeronave SÍ", "entrega de aeronave" in dlv["angulo_editorial"].lower())
+# 4. 'direct flight' clasifica como rutas
+df = A.analyze_heuristic("China plans direct flight to connect the Dominican Republic and boost tourism", 1)
+ok("categoria · 'direct flight' = rutas", df["categoria"] == "rutas")
+# 5. La oficina emisora (NWS Miami) no es zona afectada
+nhc = A._extract_context("Tropical Weather Outlook NWS National Hurricane Center Miami FL issued for the Caribbean")
+ok("porqué · 'NWS ... Miami' no es zona afectada", "Miami" not in nhc["places"] and any("Caribbean" in p for p in nhc["places"]))
+# 6. Aerolínea con operación en PUJ = vínculo indirecto (no 'presencia directa')
+ind = A.analyze_heuristic("JetBlue Airbus A320 makes emergency landing in Boston", 1)
+ok("porqué · aerolínea sin mención PUJ = vínculo indirecto", "también en puj" in ind["angulo_editorial"].lower())
+dirp = A.analyze_heuristic("Emergency landing at Punta Cana airport involves charter flight", 1)
+ok("porqué · mención directa PUJ = impacto directo", "directamente a puj" in dirp["angulo_editorial"].lower())
+# 7. Cifra de visitantes = indicador de demanda, no 'desarrollo de la industria' genérico
+tur = A.analyze_heuristic("Turismo: RD recibió 6.6 millones de visitantes en el primer semestre, informa Air France", 1)
+ok("porqué · cifra de visitantes = demanda", "demanda" in tur["angulo_editorial"].lower())
+
 # ── Resiliencia LLM: backoff + reintentos (sin red: urlopen simulado) ──
 ok("backoff · exponencial 2/6/18", (A._retry_delay(0), A._retry_delay(1), A._retry_delay(2)) == (2.0, 6.0, 18.0))
 ok("backoff · respeta Retry-After", A._retry_delay(0, "7") == 7.0)
