@@ -324,6 +324,21 @@ _batch = [
 _kept = NT.drop_replaced(_batch)
 ok("notam · reemplazado se elimina del lote", [n["id"] for n in _kept] == ["A205/26"])
 ok("notam · lote sin referencias queda intacto", len(NT.drop_replaced([_batch[0]])) == 1)
+# FAA NOTAM Search (fuente primaria): conversión de su formato al crudo de normalize()
+_faa_item = {"notamNumber": "A0250/26", "facilityDesignator": "MDPC",
+             "startDate": "04/22/2026 1000", "endDate": "07/15/2026 2000",
+             "icaoMessage": "A0250/26 NOTAMN\nQ) MDCS/QMPLC/IV/BO/A/000/999\nA) MDPC B) 2604221000",
+             "traditionalMessageFrom4thWord": "ACFT STANDS B34 B35 CLSD",
+             "cancelledOrExpired": False}
+_fr = NT._faa_to_raw(_faa_item)
+ok("notam-faa · id y cuerpo", _fr["notam_id"] == "A0250/26" and "B34" in _fr["body"])
+ok("notam-faa · fecha convertida a ISO", _fr["effective"].startswith("2026-04-22T10:00"))
+ok("notam-faa · tipo N extraído del mensaje ICAO", _fr["type"] == "N")
+ok("notam-faa · PERM pasa tal cual", NT._faa_dt("PERM") == "PERM" and NT._faa_dt("") is None)
+_fn = NT.normalize(_fr)
+ok("notam-faa · normaliza y clasifica", _fn["subject"] == "Plataforma" and _fn["status"] == "vigente")
+_frr = NT._faa_to_raw({"notamNumber": "A9/26", "icaoMessage": "A9/26 NOTAMR A8/26\nE) TWY B CLSD"})
+ok("notam-faa · tipo R detectado", _frr["type"] == "R")
 
 # ── NAS (FAA): parseo del XML de nasstatus.faa.gov (demo, sin red) ──
 import nas as NS

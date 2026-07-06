@@ -3,14 +3,22 @@
 # La clave SOLO se lee de entorno (RAPIDAPI_KEY) y vive server-side (pipeline / GitHub Actions):
 # NUNCA se incrusta en el HTML ni se commitea. Si no hay clave o el API falla, devuelve [] y la
 # sección NOTAM simplemente no aparece (degradación elegante, no rompe el dashboard).
-import os, re, json, ssl, urllib.request, urllib.error
+import os, re, json, ssl, urllib.request, urllib.parse, urllib.error
 from datetime import datetime, timezone
 
 ICAO_DEFAULT = os.environ.get("AEROINTEL_NOTAM_ICAO", "MDPC")   # MDPC = Aeropuerto de Punta Cana
 RAPID_HOST = "skylink-api.p.rapidapi.com"
+# FUENTE PRIMARIA: FAA NOTAM Search (gratis, sin clave, distribución oficial). Auditoría del
+# 6 jul 2026: SkyLink servía 16 NOTAMs para MDPC cuando la FAA distribuía 8 — retenía avisos
+# ya incorporados al AIP/cancelados (hasta 177 días viejos) y omitía uno nuevo. SkyLink queda
+# como RESPALDO si la FAA no responde (requiere RAPIDAPI_KEY).
+FAA_SEARCH_URL = "https://notams.aim.faa.gov/notamSearch/search"
+_BROWSER_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+               "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 # Fuente mostrada en cada tarjeta NOTAM (como en las noticias: nombre + enlace verificable).
-# La autoridad oficial de los NOTAM de RD es el AIS del IDAC; SkyLink es el proveedor de datos.
-SOURCE_NAME = os.environ.get("AEROINTEL_NOTAM_SOURCE", "AIS/IDAC · vía SkyLink")
+# La autoridad oficial de los NOTAM de RD es el AIS del IDAC.
+SOURCE_NAME = os.environ.get("AEROINTEL_NOTAM_SOURCE", "AIS/IDAC · vía FAA NOTAM Search")
+SOURCE_NAME_SKYLINK = "AIS/IDAC · vía SkyLink (respaldo)"
 SOURCE_URL = os.environ.get("AEROINTEL_NOTAM_SOURCE_URL", "https://www.idac.gob.do/")
 
 
@@ -206,14 +214,61 @@ def drop_replaced(items):
     return [n for n in items if n["id"] not in dead]
 
 
-def fetch_notams(icao=ICAO_DEFAULT, key=None, timeout=25):
-    """Devuelve (lista_normalizada, error|None). Lista vacía si no hay clave o falla el API."""
-    if os.environ.get("AEROINTEL_NOTAM_DEMO", "").lower() in ("1", "true", "yes"):
-        out = [normalize(n) for n in _demo_raw()]
-        out = drop_replaced([n for n in out if n["status"] != "expirado"])
-        rank, sstat = {"alta": 0, "media": 1}, {"vigente": 0, "programado": 1}
-        out.sort(key=lambda n: (rank.get(n["importance"], 2), sstat.get(n["status"], 2), n["effective"] or ""))
-        return out, None
+def _postprocess(out):
+    """Post-proceso común a todas las fuentes: sin expirados, sin reemplazados, orden operativo."""
+    out = drop_replaced([n for n in out if n["status"] != "expirado"])
+    rank, sstat = {"alta": 0, "media": 1}, {"vigente": 0, "programado": 1}
+    out.sort(key=lambda n: (rank.get(n["importance"], 2), sstat.get(n["status"], 2), n["effective"] or ""))
+    return out
+
+
+# ── FAA NOTAM Search (fuente primaria) ──
+def _faa_dt(s):
+    """'MM/DD/YYYY HHMM' (UTC) → ISO; 'PERM'/vacío pasan tal cual (normalize los maneja)."""
+    t = (s or "").strip()
+    if not t or t.upper() in ("PERM", "PERMANENT", "UFN"):
+        return t or None
+    try:
+        return datetime.strptime(t, "%m/%d/%Y %H%M").replace(tzinfo=timezone.utc).isoformat()
+    except ValueError:
+        return t                       # formato inesperado → que _parse_dt intente
+
+
+_FAA_TYPE_RE = re.compile(r"NOTAM([NRC])\b")
+
+def _faa_to_raw(item):
+    """Convierte un ítem del API de la FAA al formato crudo que consume normalize()."""
+    icao_msg = (item.get("icaoMessage") or "").strip()
+    m = _FAA_TYPE_RE.search(icao_msg)
+    return {
+        "notam_id": (item.get("notamNumber") or "").strip(),
+        "type": m.group(1) if m else "",
+        "location": item.get("facilityDesignator") or "",
+        "effective": _faa_dt(item.get("startDate")),
+        "expiration": _faa_dt(item.get("endDate")),
+        "body": (item.get("traditionalMessageFrom4thWord") or item.get("plainLanguageMessage") or "").strip(),
+        "raw": icao_msg,
+    }
+
+
+def fetch_notams_faa(icao=ICAO_DEFAULT, timeout=20):
+    """NOTAMs vigentes desde el buscador oficial de la FAA (sin clave). Lanza si falla."""
+    data = urllib.parse.urlencode({"searchType": "0", "designatorsForLocation": icao}).encode()
+    req = urllib.request.Request(FAA_SEARCH_URL, data=data, headers={
+        "User-Agent": _BROWSER_UA,
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "application/json"})
+    try:
+        raw = json.loads(urllib.request.urlopen(req, timeout=timeout).read())
+    except (ssl.SSLError, urllib.error.URLError):
+        ctx = ssl._create_unverified_context()
+        raw = json.loads(urllib.request.urlopen(req, timeout=timeout, context=ctx).read())
+    items = [i for i in (raw.get("notamList") or []) if not i.get("cancelledOrExpired")]
+    return _postprocess([normalize(_faa_to_raw(i)) for i in items])
+
+
+def fetch_notams_skylink(icao=ICAO_DEFAULT, key=None, timeout=25):
+    """Respaldo: SkyLink API (RapidAPI). Devuelve (lista, error|None)."""
     key = key or os.environ.get("RAPIDAPI_KEY") or os.environ.get("SKYLINK_API_KEY")
     if not key:
         return [], "sin clave (RAPIDAPI_KEY)"
@@ -231,11 +286,24 @@ def fetch_notams(icao=ICAO_DEFAULT, key=None, timeout=25):
         return [], f"HTTP {e.code} {msg}".strip()
     except Exception as e:
         return [], f"{type(e).__name__}: {e}"
-    items = raw.get("notams") or []
-    out = [normalize(n) for n in items]
-    out = [n for n in out if n["status"] != "expirado"]            # solo activos/programados
-    out = drop_replaced(out)                                       # sin reemplazados/cancelados
-    rank = {"alta": 0, "media": 1}
-    sstat = {"vigente": 0, "programado": 1}
-    out.sort(key=lambda n: (rank.get(n["importance"], 2), sstat.get(n["status"], 2), n["effective"] or ""))
+    out = _postprocess([normalize(n) for n in (raw.get("notams") or [])])
+    for n in out:                                   # etiquetar el origen real de estos datos
+        if n["source"] == SOURCE_NAME:
+            n["source"] = SOURCE_NAME_SKYLINK
+    return out, None
+
+
+def fetch_notams(icao=ICAO_DEFAULT, key=None, timeout=25):
+    """Devuelve (lista_normalizada, error|None). Orden de fuentes: demo → FAA (oficial, sin
+    clave) → SkyLink (respaldo con clave). Si todo falla, ([], error) y la sección se omite."""
+    if os.environ.get("AEROINTEL_NOTAM_DEMO", "").lower() in ("1", "true", "yes"):
+        return _postprocess([normalize(n) for n in _demo_raw()]), None
+    try:
+        return fetch_notams_faa(icao, timeout=timeout), None
+    except Exception as e:
+        faa_err = f"FAA: {type(e).__name__}: {e}"
+    out, sky_err = fetch_notams_skylink(icao, key=key, timeout=timeout)
+    if sky_err:
+        return [], f"{faa_err} · SkyLink: {sky_err}"
+    print(f"  NOTAM: FAA no respondió ({faa_err}) — usando respaldo SkyLink")
     return out, None

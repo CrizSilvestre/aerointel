@@ -159,13 +159,16 @@ Ver `.env.example`. Las más relevantes:
 ## NOTAMs de la estación (categoría operativa)
 
 Sección **NOTAM** con los avisos a la navegación aérea **vigentes y programados** de la estación
-(**MDPC** = Punta Cana), vía **SkyLink API** (RapidAPI). `notams.py` los clasifica por **sujeto
-operativo** (Pista, Calle de rodaje, Plataforma, Ayuda a navegación, Iluminación, Obstáculo,
-Actividad UAS/drones, Fauna…), marca **importancia alta** (cierres de pista/aeródromo, ayudas
-críticas U/S) y **estado** (vigente/programado), con la vigencia en **hora local RD**.
+(**MDPC** = Punta Cana). `notams.py` los clasifica por **sujeto operativo** (Pista, Calle de
+rodaje, Plataforma, Ayuda a navegación, Iluminación, Obstáculo, Actividad UAS/drones, Fauna…),
+marca **importancia alta** (cierres de pista/aeródromo, ayudas críticas U/S) y **estado**
+(vigente/programado), con la vigencia en **hora local RD**.
 
-- La clave (`RAPIDAPI_KEY`) es **server-side**: se usa en el pipeline / GitHub Actions y **nunca**
-  llega al navegador ni se commitea. Sin clave/suscripción, la sección simplemente **no aparece**.
+- **Fuente primaria: FAA NOTAM Search** (gratis, sin clave, distribución oficial). Auditoría
+  jul 2026: SkyLink servía 16 NOTAMs cuando la FAA distribuía 8 — retenía avisos ya
+  incorporados al AIP (hasta 177 días viejos) y omitía nuevos.
+- **Respaldo: SkyLink API** (RapidAPI) si la FAA no responde. La clave (`RAPIDAPI_KEY`) es
+  **server-side** y nunca llega al navegador. Sin ninguna fuente, la sección no aparece.
 - `AEROINTEL_NOTAM_DEMO=1` muestra NOTAMs de ejemplo para previsualizar la categoría.
 - Cada tarjeta cita su **fuente con enlace** (como las noticias): AIS/IDAC por defecto
   (`AEROINTEL_NOTAM_SOURCE` / `AEROINTEL_NOTAM_SOURCE_URL` lo personalizan).
