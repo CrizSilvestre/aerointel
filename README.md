@@ -139,6 +139,8 @@ Ver `.env.example`. Las más relevantes:
 `/api/news/sources` · `/api/analytics` · `/docs` (OpenAPI).
 
 `/api/notams.json` — NOTAMs activos de la estación (si está configurado).
+`/api/nas.json` — Estado del NAS (FAA): ground stops/demoras/cierres activos en EE.UU.
+`/api/weather.json` — METAR de MDPC traído server-side (el navegador lo lee mismo-origen).
 
 ---
 
@@ -159,6 +161,18 @@ críticas U/S) y **estado** (vigente/programado), con la vigencia en **hora loca
 
 > Endpoint real usado: `GET https://skylink-api.p.rapidapi.com/notams/{ICAO}` (fechas en formato
 > NOTAM `YYYYMMDDHHMM` / `PERM`; el código las normaliza).
+
+---
+
+## Estado del NAS · EE.UU. (categoría operativa)
+
+Sección **NAS EE.UU.** con los **ground stops, programas de demora y cierres activos** del
+sistema estadounidense, vía el API oficial de la FAA (`nasstatus.faa.gov`). Un ground stop en
+MIA/JFK/FLL cascadea directo a los itinerarios de PUJ: los eventos en aeropuertos con servicio
+a Punta Cana se marcan **Ruta PUJ** y encabezan la lista (`nas.py` · `PUJ_US_AIRPORTS`).
+Causas traducidas al español; cierres solo-aviación general se etiquetan aparte (no afectan
+la operación comercial). Sin clave ni registro; si el API falla, la sección no aparece.
+`AEROINTEL_NAS_DEMO=1` para previsualizar con datos de ejemplo.
 
 ---
 

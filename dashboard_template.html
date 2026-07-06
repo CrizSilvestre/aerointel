@@ -1371,6 +1371,7 @@
   <script>
     const EVENTS = /*DATA*/;
     const NOTAMS = /*NOTAMS*/;   // NOTAMs activos de MDPC (vacío si no hay clave/suscripción → no se muestra)
+    const NAS = /*NAS*/;         // Estado del NAS (FAA): ground stops/demoras en EE.UU. (vacío → no se muestra)
     const CAT = {
       meteo: { label: 'Clima', g: ['#0e7c5a', '#0a5e44'] },
       seguridad: { label: 'Seguridad', g: ['#b3361f', '#7e2417'] },
@@ -1642,6 +1643,7 @@
     ...(EVENTS.some(isRD) ? [['rd', 'Rep. Dominicana']] : []),
     ['puj', 'Hub PUJ'],
     ...(NOTAMS.length ? [['notam', `NOTAM ${NOTAMS.length}`]] : []),
+    ...((NAS.events || []).length ? [['nas', `NAS EE.UU. ${NAS.events.length}`]] : []),
     ...cats.map(c => ['cat:' + c, catOf(c).label])];
     let view = 'portada';
     const nav = document.getElementById('nav');
@@ -1778,6 +1780,39 @@
       </div>`;
     }
 
+    // ── NAS (FAA): ground stops / programas de demora / cierres en EE.UU. — cascada a PUJ ──
+    function nasCard(e) {
+      const critical = (e.kind === 'GS' || (e.kind === 'CLOSURE' && !e.ga_only)) && e.puj_route;
+      return `<article class="notam-card ${critical ? 'alta' : ''}">
+        <div class="ntop">
+          <span class="nid">${esc(e.airport)}</span>
+          <span class="nsub">${esc(e.label)}</span>
+          ${e.puj_route ? '<span class="pujtag">Ruta PUJ</span>' : ''}
+          ${critical ? '<span class="nhigh">Alta</span>' : ''}
+        </div>
+        <div class="nread">${esc(e.label)} por ${esc(e.reason_es)}${e.detail ? ` · ${esc(e.detail)}` : ''}.</div>
+        <div class="nfoot">Fuente: ${esc(e.source)} · <a href="${esc(e.source_url)}" target="_blank" rel="noopener">Ver fuente</a></div>
+      </article>`;
+    }
+    function nasView() {
+      const evs = NAS.events || [];
+      const nPuj = evs.filter(e => e.puj_route).length;
+      const byLabel = {};
+      evs.forEach(e => { byLabel[e.label] = (byLabel[e.label] || 0) + 1; });
+      const chips = evs.length ? `<div class="notam-sum">
+        ${nPuj ? `<span class="alta">Red PUJ · ${nPuj}</span>` : ''}
+        ${Object.entries(byLabel).sort((a, b) => b[1] - a[1]).map(([s, c]) => `<span>${esc(s)} · ${c}</span>`).join('')}
+      </div>` : '';
+      const cards = evs.map(nasCard).join('') || `<p style="color:var(--muted)">Sin eventos activos en el NAS.</p>`;
+      return `<div class="section">
+        <div class="section-h"><span class="t">NAS · Estado del sistema de EE.UU. (FAA)</span><span class="rule"></span></div>
+        <div class="notam-note">Ground stops, programas de demora y cierres <b>activos ahora</b> en aeropuertos de EE.UU. — un evento en la red marcada <b>Ruta PUJ</b> cascadea a los itinerarios de Punta Cana. Horas en hora local del este de EE.UU.
+        <span class="notam-disc">Fuente oficial: FAA NAS Status${NAS.updated ? ` · actualizado ${esc(NAS.updated)}` : ''}.</span></div>
+        ${chips}
+        <div class="notam-grid">${cards}</div>
+      </div>`;
+    }
+
     function render() {
       [...nav.children].forEach(b => b.classList.toggle('active', b.dataset.k === view));
       const main = document.getElementById('main');
@@ -1808,6 +1843,9 @@
         const high = NOTAMS.filter(n => n.importance === 'alta').length;
         tc.innerHTML = `<b>${NOTAMS.length}</b> NOTAM activos`;
         main.innerHTML = notamView(high);
+      } else if (view === 'nas') {
+        tc.innerHTML = `<b>${(NAS.events || []).length}</b> eventos NAS activos`;
+        main.innerHTML = nasView();
       } else {
         let list, title;
         if (view === 'breaking') {

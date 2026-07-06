@@ -309,5 +309,31 @@ ok("notam · fuente por defecto = AIS/IDAC", NT.normalize({"raw": "TWY C WIP", "
 ok("notam · source_url presente", NT.normalize({"raw": "TWY C WIP"})["source_url"].startswith("https://"))
 ok("notam · scope separado de la fuente", NT.normalize({"raw": "TWY C WIP", "scope": "A"})["scope"] == "Aeródromo")
 
+# ── NAS (FAA): parseo del XML de nasstatus.faa.gov (demo, sin red) ──
+import nas as NS
+upd, nev = NS.parse_nas(NS._demo_xml())
+ok("nas · update time parseado", "2026" in upd)
+ok("nas · 3 eventos del demo", len(nev) == 3)
+ok("nas · red PUJ primero", nev[0]["airport"] == "JFK" and nev[0]["puj_route"] is True)
+ok("nas · GS antes que GDP dentro de PUJ", nev[0]["kind"] == "GS" and nev[1]["airport"] == "MIA" and nev[1]["kind"] == "GDP")
+ok("nas · fuera de red PUJ al final", nev[2]["airport"] == "SAN" and nev[2]["puj_route"] is False)
+ok("nas · causa traducida", nev[0]["reason_es"] == "tormentas eléctricas")
+ok("nas · detalle GDP con demora media", "demora media" in nev[1]["detail"])
+ok("nas · fuente oficial con enlace", nev[0]["source_url"].startswith("https://nasstatus.faa.gov"))
+os.environ["AEROINTEL_NAS_DEMO"] = "1"
+nd_data, nd_err = NS.fetch_nas()
+ok("nas · demo mode sin error", nd_err is None and len(nd_data["events"]) == 3)
+del os.environ["AEROINTEL_NAS_DEMO"]
+# Cierre solo aviación general: etiquetado como GA, sin causa cruda de NOTAM, y al final del grupo
+_ga_xml = (b"<AIRPORT_STATUS_INFORMATION><Update_Time>x</Update_Time><Delay_type>"
+           b"<Name>Airport Closures</Name><Airport_Closure_List>"
+           b"<Airport><ARPT>EWR</ARPT><Reason>!EWR 06/034 EWR AD AP CLSD TO TRANSIENT GA ACFT EXC 24HR PPR</Reason></Airport>"
+           b"<Airport><ARPT>MIA</ARPT><Reason>weather</Reason><Reopen>10:00 pm EDT</Reopen></Airport>"
+           b"</Airport_Closure_List></Delay_type></AIRPORT_STATUS_INFORMATION>")
+_, gev = NS.parse_nas(_ga_xml)
+ok("nas · cierre GA etiquetado", gev[1]["ga_only"] is True and "aviación general" in gev[1]["label"])
+ok("nas · NOTAM crudo no ensucia la causa", "!EWR" not in gev[1]["reason_es"])
+ok("nas · cierre real primero, GA después", gev[0]["airport"] == "MIA" and gev[0]["ga_only"] is False)
+
 print(f"\n{'ALL PASS' if not fails else str(fails) + ' FAILED'}")
 sys.exit(1 if fails else 0)

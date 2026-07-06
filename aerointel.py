@@ -12,7 +12,7 @@ from difflib import SequenceMatcher
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import Counter
-import store, apiexport, notams
+import store, apiexport, notams, nas
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "output")
@@ -1022,10 +1022,12 @@ def fetch_weather(icao="MDPC"):
 
 # ── Monitor de salud: aviso a Mattermost el DÍA que algo falle (fuente caída, NOTAM, LLM
 #    degradado), no semanas después. Solo se envía si hay algo que reportar. ──
-def health_payload(fails, total_sources, notam_err=None, llm_fallbacks=0):
+def health_payload(fails, total_sources, notam_err=None, llm_fallbacks=0, nas_err=None):
     lines = [f"- **{f['name']}**: {f['error']}" for f in fails]
     if notam_err:
         lines.append(f"- **NOTAM (SkyLink)**: {notam_err}")
+    if nas_err:
+        lines.append(f"- **NAS (FAA)**: {nas_err}")
     if llm_fallbacks:
         lines.append(f"- **LLM**: {llm_fallbacks} evento(s) cayeron a heurística (rate limit/errores persistentes)")
     text = (f"**Monitor de salud de la corrida** · {len(fails)}/{total_sources} fuentes con fallo\n\n"
@@ -1071,7 +1073,7 @@ def entity_chips(analysis):
             out.append(c)
     return out[:3]
 
-def write_dashboard(events, notam_list=None):
+def write_dashboard(events, notam_list=None, nas_data=None):
     tpl_path = os.path.join(HERE, "dashboard_template.html")
     if not os.path.exists(tpl_path):
         return
@@ -1092,6 +1094,7 @@ def write_dashboard(events, notam_list=None):
     out = (open(tpl_path, encoding="utf-8").read()
            .replace("/*DATA*/", json.dumps(data, ensure_ascii=False))
            .replace("/*NOTAMS*/", json.dumps(notam_list or [], ensure_ascii=False))
+           .replace("/*NAS*/", json.dumps(nas_data or {"updated": None, "events": []}, ensure_ascii=False))
            .replace("__UPDATED__", f"{datetime.now():%d %b %Y %H:%M}")
            .replace("__BUILD_ISO__", build_iso)
            .replace("__MM_URL__", mm_url))
@@ -1175,6 +1178,14 @@ def main():
             if done:
                 print(f"  NOTAM · IA interpretó {done}/{len(notam_list)} (resto: lectura heurística)")
 
+    # 4c') Estado del NAS (FAA): ground stops / demoras en EE.UU. que cascadean a PUJ.
+    nas_data, nas_err = nas.fetch_nas()
+    if nas_err:
+        print(f"  NAS (FAA): omitido — {nas_err}")
+    else:
+        n_puj = sum(1 for e in nas_data["events"] if e["puj_route"])
+        print(f"  NAS (FAA): {len(nas_data['events'])} eventos activos ({n_puj} en red PUJ)")
+
     # 4c) METAR server-side → /api/weather.json (el navegador ya no puede llamar a
     # aviationweather.gov por CORS; mismo-origen no tiene ese problema).
     wx = fetch_weather()
@@ -1188,8 +1199,11 @@ def main():
     json.dump([to_mattermost(ev) for ev in events],
               open(os.path.join(OUT, "mattermost_payloads.json"), "w", encoding="utf-8"),
               ensure_ascii=False, indent=2)
+    json.dump(nas_data, open(os.path.join(api_dir, "nas.json"), "w", encoding="utf-8"),
+              ensure_ascii=False, indent=2)
+
     write_briefing(events)
-    write_dashboard(events, notam_list)
+    write_dashboard(events, notam_list, nas_data)
 
     # 5) persistencia (SQLite) + API estática JSON. Aislado en try: nunca debe tumbar la corrida.
     breaking_n = sum(1 for ev in events if ev["analysis"]["severidad"] in ("crítico", "importante"))
@@ -1229,15 +1243,16 @@ def main():
     # Salud de la corrida: aviso solo si algo falló (fuente caída / NOTAM con clave / LLM degradado).
     src_fails = [h for h in src_health if not h["ok"]]
     notam_alert = notam_err if (notam_err and "sin clave" not in notam_err) else None
-    if src_fails or notam_alert or _LLM_STATS["fallbacks"]:
+    if src_fails or notam_alert or nas_err or _LLM_STATS["fallbacks"]:
         resumen = (f"⚠ salud: {len(src_fails)} fuente(s) caída(s)"
                    + (f" · NOTAM: {notam_alert}" if notam_alert else "")
+                   + (f" · NAS: {nas_err}" if nas_err else "")
                    + (f" · LLM→heurística: {_LLM_STATS['fallbacks']}" if _LLM_STATS["fallbacks"] else "")
                    + (f" · reintentos LLM: {_LLM_STATS['retries']}" if _LLM_STATS["retries"] else ""))
         print(f"  {resumen}")
         if hook:
             try:
-                post(hook, health_payload(src_fails, len(SOURCES), notam_alert, _LLM_STATS["fallbacks"]))
+                post(hook, health_payload(src_fails, len(SOURCES), notam_alert, _LLM_STATS["fallbacks"], nas_err))
                 print("  → aviso de salud publicado en Mattermost ✓")
             except Exception as e:
                 print(f"  ⚠ no se pudo publicar el aviso de salud ({type(e).__name__}: {e})")
