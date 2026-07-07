@@ -16,10 +16,11 @@ FAA_SEARCH_URL = "https://notams.aim.faa.gov/notamSearch/search"
 _BROWSER_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
                "(KHTML, like Gecko) Chrome/124.0 Safari/537.36")
 # Fuente mostrada en cada tarjeta NOTAM (como en las noticias: nombre + enlace verificable).
-# La autoridad oficial de los NOTAM de RD es el AIS del IDAC.
+# La autoridad oficial de los NOTAM de RD es el AIS del IDAC; el enlace apunta al buscador de
+# la FAA porque ahí el lector puede VER los NOTAMs de MDPC al instante (buscar "MDPC").
 SOURCE_NAME = os.environ.get("AEROINTEL_NOTAM_SOURCE", "AIS/IDAC · vía FAA NOTAM Search")
 SOURCE_NAME_SKYLINK = "AIS/IDAC · vía SkyLink (respaldo)"
-SOURCE_URL = os.environ.get("AEROINTEL_NOTAM_SOURCE_URL", "https://www.idac.gob.do/")
+SOURCE_URL = os.environ.get("AEROINTEL_NOTAM_SOURCE_URL", "https://notams.aim.faa.gov/notamSearch/")
 
 
 def _parse_dt(s):
