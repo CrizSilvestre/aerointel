@@ -1159,26 +1159,61 @@
         padding: 14px;
       }
 
+      /* Header móvil con filas INTENCIONALES: fecha|reloj → clima centrado → EN VIVO|stats.
+         Nada se apila al azar; cada fila tiene un propósito y el conjunto queda compacto. */
       .util-top {
-        padding: 8px 14px;
-        gap: 8px 10px;
+        padding: 9px 12px 8px;
+        gap: 7px 10px;
       }
+
+      .util-top .wx {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        row-gap: 7px;
+      }
+
+      .wx-sep { display: none; }
+
+      .util-top .wx-pill {
+        width: 100%;
+        justify-content: center;   /* el clima, centrado en su propia fila */
+      }
+
+      .wx-wind { display: none; }  /* el viento/pista no cabe; queda en escritorio */
 
       .util-top .right-top {
         margin-left: 0;
         width: 100%;
         justify-content: space-between;
         gap: 8px 10px;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
       }
 
+      .util-top .live { font-size: 10.5px; white-space: nowrap; }
+      .util-top .stats { font-size: 10.5px; white-space: nowrap; }
+
       .util-actions {
-        padding: 6px 14px;
+        padding: 7px 12px;
         gap: 8px;
       }
 
       .util-actions .act-sep {
         display: none;
+      }
+
+      .util-actions .act-group {
+        width: 100%;
+        display: flex;
+        gap: 8px;
+      }
+
+      .trans-btn, .mm-btn {
+        flex: 1 1 0;               /* los dos botones comparten la fila a partes iguales */
+        text-align: center;
+        font-size: 12.5px;
       }
 
       .util .ver {
@@ -1188,6 +1223,22 @@
       .masthead {
         padding: 12px 14px 10px;
       }
+
+      .masthead .owner {
+        display: inline-block;     /* fluye como texto: sin cortes raros del flex */
+        font-size: 10.5px;
+        padding: 4px 12px;
+        text-align: center;
+        line-height: 1.5;
+      }
+
+      .masthead .owner-dot {
+        display: inline-block;
+        vertical-align: middle;
+        margin-right: 6px;
+      }
+
+      .owner-pre { display: none; }   /* "Una herramienta de" sobra en pantalla chica */
 
       .masthead h1 {
         font-size: 27px;
@@ -1357,7 +1408,7 @@
       <h1>Aviation Intelligence <span class="pl">Daily</span></h1>
       <div class="sub">Operaciones · Aerolíneas · Seguridad · Clima · Industria — vigilancia 24/7 del mundo aeronáutico
       </div>
-      <div class="owner"><span class="owner-dot"></span>Una herramienta de <b>Gestión Operaciones Airside</b> ·
+      <div class="owner"><span class="owner-dot"></span><span class="owner-pre">Una herramienta de&nbsp;</span><b>Gestión Operaciones Airside</b>&nbsp;·
         Aeropuerto de Punta Cana (PUJ)</div>
     </div>
     <nav class="sections" id="nav"></nav>
