@@ -4,10 +4,14 @@ name: AeroIntel update
 # GitHub Pages (y publica lo crítico a Mattermost si está configurado).
 on:
   schedule:
-    # Cada 30 min, en los minutos 7 y 37: los minutos 0/30 son los más congestionados de
-    # GitHub Actions y ahí es donde más corridas programadas se descartan (vimos huecos de
-    # hasta 4 h de madrugada). Correr fuera de la estampida reduce los saltos.
-    - cron: "7,37 * * * *"
+    # OJO: los crons de Actions son "best effort" — GitHub descarta disparos bajo carga.
+    # Medido (jul 2026): con 2 disparos/hora la cadencia real fue mediana 101 min y huecos
+    # de hasta 5 h. Programar cada 15 min (minutos impares, fuera de la estampida de :00/:30)
+    # compra más boletos: aunque descarte la mayoría, la cadencia real ronda los 30-50 min.
+    # Las corridas que sí ejecutan son gratis (repo público); el presupuesto LLM lo protege
+    # el cortacircuito. Si algún día se necesita cadencia GARANTIZADA: disparar
+    # workflow_dispatch desde un cron externo (p. ej. cron-job.org) con un PAT.
+    - cron: "7,22,37,52 * * * *"
   workflow_dispatch: {}          # permite correrlo a mano desde Actions
 
 permissions:
