@@ -86,7 +86,9 @@ def write_dashboard(events, notam_list=None, nas_data=None):
            .replace("/*NAS*/", json.dumps(nas_data or {"updated": None, "events": []}, ensure_ascii=False))
            .replace("__UPDATED__", f"{datetime.now():%d %b %Y %H:%M}")
            .replace("__BUILD_ISO__", build_iso)
-           .replace("__MM_URL__", mm_url))
+           .replace("__MM_URL__", mm_url)
+           # URL del Worker del botón "Actualizar" (público, sin secretos). Vacío → botón oculto.
+           .replace("__REFRESH_URL__", os.environ.get("AEROINTEL_REFRESH_URL", "")))
     with open(os.path.join(OUT, "dashboard.html"), "w", encoding="utf-8") as f:
         f.write(out)
 

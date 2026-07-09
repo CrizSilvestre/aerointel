@@ -1,0 +1,7 @@
+# Config del Worker "aerointel-refresh" (botón Actualizar del dashboard).
+# Deploy:   npx wrangler@4 deploy          (desde este directorio)
+# Secret:   npx wrangler@4 secret put GITHUB_TOKEN
+#           (PAT fine-grained: solo repo aerointel · permiso Actions: Read and write)
+name = "aerointel-refresh"
+main = "worker.js"
+compatibility_date = "2026-07-01"

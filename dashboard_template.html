@@ -1037,6 +1037,11 @@
     }
 
     /* ── Botón traducir ── */
+    .trans-btn[disabled] {
+      opacity: .55;
+      cursor: default;
+    }
+
     .trans-btn {
       border: 1px solid var(--line);
       background: #fff;
@@ -1211,10 +1216,13 @@
       }
 
       .trans-btn, .mm-btn {
-        flex: 1 1 0;               /* los dos botones comparten la fila a partes iguales */
+        flex: 1 1 0;               /* los botones comparten la fila a partes iguales */
         text-align: center;
         font-size: 12.5px;
       }
+
+      #refresh-btn { flex: 0 0 auto; }
+      #refresh-btn .refresh-label { display: none; }   /* en móvil, solo el ícono ⟳ */
 
       .util .ver {
         display: none;
@@ -1400,6 +1408,9 @@
             Traducir</button>
           <button class="mm-btn" id="mm-btn" title="Copia un resumen estructurado y abre Mattermost">🛰️ Resumen →
             Mattermost</button>
+          <button class="trans-btn" id="refresh-btn" hidden
+            title="Dispara una corrida nueva del pipeline (máx. 1 cada 30 min — límite del servidor)">⟳
+            <span class="refresh-label">Actualizar</span></button>
         </div>
       </div>
     </div>
@@ -1680,6 +1691,56 @@
       }
       window.open(MM_URL, '_blank', 'noopener');   // misma activación de usuario → el navegador no lo bloquea
     });
+
+    // ── Botón "Actualizar": dispara una corrida del pipeline vía Cloudflare Worker. El token
+    //    de GitHub vive en el Worker (nunca en el navegador) y el límite de 30 min lo aplica
+    //    EL SERVIDOR (consulta la última corrida real en GitHub); lo de aquí es solo UX. ──
+    (function () {
+      const REFRESH_URL = '__REFRESH_URL__';
+      const btn = document.getElementById('refresh-btn');
+      if (!REFRESH_URL || REFRESH_URL.startsWith('__')) return;   // sin Worker configurado → oculto
+      btn.hidden = false;
+      const COOLDOWN_MIN = 30;
+      let coolUntil = 0;
+
+      function paint() {
+        const left = Math.ceil((coolUntil - Date.now()) / 60000);
+        if (left > 0) {
+          btn.disabled = true;
+          btn.innerHTML = `⟳ <span class="refresh-label">En ${left} min</span>`;
+        } else {
+          btn.disabled = false;
+          btn.innerHTML = '⟳ <span class="refresh-label">Actualizar</span>';
+        }
+      }
+      // Estado inicial: si la edición actual es reciente, arrancar en cooldown (UX honesta)
+      const buildAge = ageH(BUILD_ISO);
+      if (buildAge != null && buildAge * 60 < COOLDOWN_MIN)
+        coolUntil = Date.now() + (COOLDOWN_MIN - buildAge * 60) * 60000;
+      paint();
+      setInterval(paint, 30000);
+
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.innerHTML = '⟳ <span class="refresh-label">Disparando…</span>';
+        try {
+          const r = await fetch(REFRESH_URL, { method: 'POST' });
+          const d = await r.json().catch(() => ({}));
+          if (r.ok && d.ok) {
+            coolUntil = Date.now() + COOLDOWN_MIN * 60000;
+            toast('✓ Corrida disparada — nueva edición en ~2-3 min (recarga la página)');
+          } else if (r.status === 429 && d.wait_min) {
+            coolUntil = Date.now() + d.wait_min * 60000;
+            toast(`La última actualización es reciente — disponible en ${d.wait_min} min`);
+          } else {
+            toast('No se pudo disparar la actualización — intenta más tarde');
+          }
+        } catch (e) {
+          toast('Sin conexión con el servicio de actualización');
+        }
+        paint();
+      });
+    })();
 
     // ticker: SOLO última hora real (reciente), ordenado del más nuevo al más viejo
     (function () {

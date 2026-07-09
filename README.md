@@ -193,6 +193,20 @@ la operación comercial). Sin clave ni registro; si el API falla, la sección no
 
 ---
 
+## Botón "Actualizar" (refresh bajo demanda)
+
+El dashboard tiene un botón **⟳ Actualizar** que dispara una corrida del pipeline sin entrar a
+GitHub. Arquitectura: un **Cloudflare Worker** (`worker/`) guarda el token de GitHub como secret
+(el navegador jamás lo ve) y aplica el **límite de 1 disparo cada 30 min del lado del servidor**
+(consulta la última corrida real — cron o manual — en GitHub; nadie lo brinca ni con curl).
+El botón muestra el estado honesto: disponible, "En N min", o confirmación de disparo.
+
+- Deploy del Worker: `cd worker && npx wrangler@4 deploy` · secret: `npx wrangler@4 secret put GITHUB_TOKEN`
+  (PAT fine-grained: solo este repo, permiso Actions Read/Write).
+- El dashboard recibe la URL vía `AEROINTEL_REFRESH_URL` (workflow); vacía → botón oculto.
+
+---
+
 ## Automatización / despliegue (24/7)
 
 1. Sube el repo a GitHub.

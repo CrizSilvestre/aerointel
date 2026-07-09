@@ -47,6 +47,9 @@ jobs:
           AEROINTEL_NOTAM_LLM_MAX: "10"     # NOTAMs top que interpreta la IA
           AEROINTEL_LLM_SLEEP: "2.0"        # ritmo entre llamadas (respeta rate limits)
           AEROINTEL_IMG_N: "48"
+          # Botón "Actualizar" del dashboard: URL pública del Worker (el token vive en el
+          # Worker como secret; el límite de 30 min lo aplica el propio Worker).
+          AEROINTEL_REFRESH_URL: "https://aerointel-refresh.crizmelvin.workers.dev"
         run: |
           python3 tests/test_pipeline.py     # los tests deben pasar antes de publicar
           python3 aerointel.py
