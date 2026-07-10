@@ -1409,7 +1409,7 @@
           <button class="mm-btn" id="mm-btn" title="Copia un resumen estructurado y abre Mattermost">🛰️ Resumen →
             Mattermost</button>
           <button class="trans-btn" id="refresh-btn" hidden
-            title="Dispara una corrida nueva del pipeline (máx. 1 cada 30 min — límite del servidor)">⟳
+            title="Busca las últimas noticias aeronáuticas (máx. 1 cada 30 min)">⟳
             <span class="refresh-label">Actualizar</span></button>
         </div>
       </div>
@@ -1722,18 +1722,18 @@
 
       btn.addEventListener('click', async () => {
         btn.disabled = true;
-        btn.innerHTML = '⟳ <span class="refresh-label">Disparando…</span>';
+        btn.innerHTML = '⟳ <span class="refresh-label">Despegando…</span>';
         try {
           const r = await fetch(REFRESH_URL, { method: 'POST' });
           const d = await r.json().catch(() => ({}));
           if (r.ok && d.ok) {
             coolUntil = Date.now() + COOLDOWN_MIN * 60000;
-            toast('✓ Corrida disparada — nueva edición en ~2-3 min (recarga la página)');
+            toast('✈️ ¡Actualización despegada! Recopilando noticias… vuelve a refrescar en ~2-3 min');
           } else if (r.status === 429 && d.wait_min) {
             coolUntil = Date.now() + d.wait_min * 60000;
             toast(`La última actualización es reciente — disponible en ${d.wait_min} min`);
           } else {
-            toast('No se pudo disparar la actualización — intenta más tarde');
+            toast('No se pudo iniciar la actualización — intenta más tarde');
           }
         } catch (e) {
           toast('Sin conexión con el servicio de actualización');
