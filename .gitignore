@@ -21,5 +21,9 @@ __pycache__/
 # Sistema
 .DS_Store
 
+# AI tooling (config local del editor)
+.claude/
+CLAUDE.md
+
 # Caché local de wrangler (Cloudflare CLI)
 worker/.wrangler/
