@@ -1340,6 +1340,69 @@
       }
     }
 
+    /* ── Carrusel del héroe (solo cuando ≥3 historias top traen foto real) ──
+       Las slides van APILADAS en la misma celda de grid: el marco mide siempre lo de la más
+       alta (imposible que salte) y permite CROSSFADE real — una se disuelve en la otra. */
+    .carousel { position: relative; }
+    .car-track { display: grid; }
+    .car-slide {
+      grid-area: 1 / 1;
+      opacity: 0; visibility: hidden;
+      transition: opacity .9s cubic-bezier(.4, 0, .2, 1), visibility .9s;
+    }
+    .car-slide.on { opacity: 1; visibility: visible; z-index: 2; }
+
+    /* Ken Burns sutil: la foto activa respira (zoom lentísimo) — la tarjeta se siente viva
+       y el crossfade se funde en un movimiento continuo en vez de cortar una imagen quieta. */
+    .car-slide.on .cover img { animation: kenburns 9s ease-out forwards; }
+    @keyframes kenburns { from { transform: scale(1); } to { transform: scale(1.045); } }
+
+    /* Flechas DENTRO de la foto: ocultas hasta que el mouse entra; semitransparentes encima
+       de la imagen, centradas verticalmente sobre ella (el overlay replica su aspect-ratio). */
+    .car-arrows {
+      position: absolute; top: 0; left: 0; right: 0;
+      aspect-ratio: 16/8;
+      z-index: 6; pointer-events: none;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 10px;
+    }
+    .car-arrow {
+      pointer-events: auto;
+      width: 38px; height: 38px; border-radius: 50%; border: 0;
+      background: rgba(10, 22, 44, .45); color: #fff;
+      font-size: 21px; line-height: 1; font-weight: 700; cursor: pointer;
+      opacity: 0; transition: opacity .25s, background .2s;
+      backdrop-filter: blur(2px);
+    }
+    .carousel:hover .car-arrow, .carousel:focus-within .car-arrow { opacity: 1; }
+    .car-arrow:hover { background: rgba(10, 22, 44, .78); }
+    @media (hover: none) { .car-arrow { opacity: .85; } }   /* táctil: siempre visibles */
+
+    .car-nav { display: flex; justify-content: center; gap: 7px; margin-top: 12px; }
+    .car-dot {
+      width: 22px; height: 4px; border-radius: 2px; border: 0; padding: 0;
+      background: #cdd5e4; cursor: pointer; transition: background .25s;
+    }
+    .car-dot.on { background: var(--navy); }
+
+    /* Altura UNIFORME entre slides: titular/resumen/impacto a líneas fijas → cero saltos */
+    .car-slide .hero h2 {
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden; min-height: 2.24em;              /* 2 líneas × lh 1.12 */
+    }
+    .car-slide .chips { min-height: 22px; }
+    .car-slide .hero .impact {
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden; box-sizing: border-box;
+      line-height: 20px;                 /* líneas a píxel exacto → el corte cae justo al final */
+      min-height: 58px; max-height: 58px;   /* 2 líneas × 20px + 18px de padding */
+    }
+    /* Preferencia de movimiento reducido: rota igual (es contenido), sin fundido ni zoom */
+    @media (prefers-reduced-motion: reduce) {
+      .car-slide { transition: none; }
+      .car-slide.on .cover img { animation: none; }
+    }
+
     /* ── NOTAMs activos de la estación (MDPC) ── */
     .notam-note { font-size: 12.5px; color: var(--muted); margin-bottom: 10px; line-height: 1.5; }
     .notam-note .notam-disc { opacity: .8; }
@@ -1829,7 +1892,7 @@
       return (e.ent && e.ent.length) ? `<div class="chips">${e.ent.map(c => `<span>${esc(c)}</span>`).join('')}</div>` : '';
     }
 
-    function heroHTML(e) {
+    function heroHTML(e, uniform) {
       const hasImg = !!(e.img && e.img.startsWith('http'));
       const imgMarkup = hasImg
         ? `<img src="${esc(e.img)}" alt="" loading="eager" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;" onerror="this.style.display='none';this.nextElementSibling.style.display='none';"><span class="img-overlay"></span>`
@@ -1843,7 +1906,7 @@
         ${freshTag(e)}<span>· ${agoText(e.iso)} · ${esc(e.source)}</span><span class="impactchip">${e.impact}/100</span>
       </div>
       <h2><a href="${esc(e.link)}" target="_blank" rel="noopener">${esc(e.title)}</a></h2>
-      ${chips(e)}${e.resumen ? `<div class="deck">${esc(e.resumen)}</div>` : ''}
+      ${chips(e) || (uniform ? '<div class="chips"></div>' : '')}${(e.resumen && !uniform) ? `<div class="deck">${esc(e.resumen)}</div>` : ''}
       <div class="impact"><b>Impacto operacional:</b> ${esc(e.why)}</div>
     </div>`;
     }
@@ -1959,6 +2022,49 @@
       </div>`;
     }
 
+    // ── Carrusel del héroe: rota tarjetas completas de historias CON foto real. ──
+    function carouselHTML(slides) {
+      return `<div class="carousel" id="hero-car" aria-roledescription="carrusel" aria-label="Historias destacadas con foto">
+        <div class="car-track">
+          ${slides.map((e, i) => `<div class="car-slide${i === 0 ? ' on' : ''}">${heroHTML(e, true)}</div>`).join('')}
+        </div>
+        <div class="car-arrows">
+          <button class="car-arrow" data-dir="-1" aria-label="Historia anterior">‹</button>
+          <button class="car-arrow" data-dir="1" aria-label="Historia siguiente">›</button>
+        </div>
+        <div class="car-nav">${slides.map((_, i) =>
+          `<button class="car-dot${i === 0 ? ' on' : ''}" data-i="${i}" aria-label="Ir a la historia ${i + 1}"></button>`).join('')}</div>
+      </div>`;
+    }
+
+    let carTimer = null;
+    function initCarousel() {
+      clearInterval(carTimer); carTimer = null;         // limpia el timer al cambiar de vista
+      const car = document.getElementById('hero-car');
+      if (!car) return;
+      const slides = [...car.querySelectorAll('.car-slide')];
+      const dots = [...car.querySelectorAll('.car-dot')];
+      let idx = 0, paused = false;
+      function go(i) {
+        idx = (i + slides.length) % slides.length;
+        slides.forEach((s, j) => s.classList.toggle('on', j === idx));
+        dots.forEach((d, j) => d.classList.toggle('on', j === idx));
+        if (transOn) applyTranslation(true);            // el slide que entra también se traduce
+      }
+      // Pausas: al pasar el mouse / enfocar (que nadie pierda la lectura a media frase)
+      car.addEventListener('mouseenter', () => paused = true);
+      car.addEventListener('mouseleave', () => paused = false);
+      car.addEventListener('focusin', () => paused = true);
+      car.addEventListener('focusout', () => paused = false);
+      car.querySelectorAll('.car-arrow').forEach(b =>
+        b.addEventListener('click', () => go(idx + (+b.dataset.dir))));
+      dots.forEach(d => d.addEventListener('click', () => go(+d.dataset.i)));
+      // Auto-avance cada 8.5 s: tiempo cómodo para leer titular + impacto sin prisa. Pausa con
+      // el mouse encima o pestaña oculta. Con "movimiento reducido" del sistema igual rota —
+      // es contenido — pero sin fundido ni zoom (lo maneja el CSS).
+      carTimer = setInterval(() => { if (!paused && !document.hidden) go(idx + 1); }, 8500);
+    }
+
     function render() {
       [...nav.children].forEach(b => b.classList.toggle('active', b.dataset.k === view));
       const main = document.getElementById('main');
@@ -1968,9 +2074,17 @@
         const pool = EVENTS.filter(timeOK);
         tc.innerHTML = `<b>${pool.length}</b> de ${EVENTS.length} historias`;
         if (!pool.length) { main.innerHTML = emptyMsg(); if (transOn) applyTranslation(true); return; }
-        const lead = pool[0];
-        let html = `<div class="lead">${heroHTML(lead)}${railHTML(pool.slice(1, 6))}</div>`;
-        const used = new Set([lead, ...pool.slice(1, 6)]);
+        // Carrusel del héroe: se activa SOLO si ≥3 historias del top 30 traen foto real.
+        // Cada slide es la tarjeta COMPLETA (foto + titular + resumen + impacto): la imagen
+        // siempre corresponde a la historia que se lee. Sin fotos suficientes → héroe clásico.
+        const slides = pool.slice(0, 30).filter(e => e.img && e.img.startsWith('http')).slice(0, 6);
+        const carousel = slides.length >= 3;
+        const slideSet = new Set(slides);
+        const heroArea = carousel ? carouselHTML(slides) : heroHTML(pool[0]);
+        // El rail conserva el ranking REAL: si el #1 no tiene foto, encabeza "Lo más relevante".
+        const railList = (carousel ? pool.filter(e => !slideSet.has(e)) : pool.slice(1)).slice(0, 5);
+        let html = `<div class="lead">${heroArea}${railHTML(railList)}</div>`;
+        const used = new Set(carousel ? [...slides, ...railList] : [pool[0], ...railList]);
         // País primero: sección República Dominicana antes de las temáticas.
         const rdList = pool.filter(e => isRD(e) && !used.has(e)).slice(0, 3);
         rdList.forEach(e => used.add(e));
@@ -2008,6 +2122,7 @@
         main.innerHTML = `<div class="section"><div class="section-h"><span class="t">${title}</span><span class="rule"></span></div>
         <div class="grid">${list.map(cardHTML).join('') || emptyMsg()}</div></div>`;
       }
+      initCarousel();                      // arma el carrusel si la portada lo trae (si no, no-op)
       if (transOn) applyTranslation(true);
     }
 
