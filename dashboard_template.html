@@ -1403,6 +1403,41 @@
       .car-slide.on .cover img { animation: none; }
     }
 
+    /* ── Carrusel: ajustes móviles ── */
+    @media(max-width:600px) {
+      /* Imagen más alta proporcionalmente para que no quede una franja delgada */
+      .car-slide .hero .cover { aspect-ratio: 16/10; }
+
+      /* Título más pequeño y permitir 3 líneas en pantalla angosta */
+      .car-slide .hero h2 {
+        font-size: 20px; letter-spacing: -.3px;
+        -webkit-line-clamp: 3; min-height: 3.36em;   /* 3 líneas × lh 1.12 */
+      }
+
+      /* Impacto: 3 líneas en móvil (el texto se envuelve más) */
+      .car-slide .hero .impact {
+        -webkit-line-clamp: 3;
+        line-height: 18px; font-size: 13px;
+        min-height: 66px; max-height: 66px;   /* 3 líneas × 18px + 12px padding */
+        padding: 6px 10px;
+      }
+
+      /* Chips más compactos */
+      .car-slide .chips { min-height: 20px; }
+
+      /* Flechas más pequeñas y siempre visibles (táctil) */
+      .car-arrow { width: 32px; height: 32px; font-size: 17px; }
+
+      /* Dots un poco más compactos */
+      .car-nav { gap: 5px; margin-top: 8px; }
+      .car-dot { width: 18px; height: 3px; }
+    }
+
+    @media(max-width:380px) {
+      .car-slide .hero h2 { font-size: 18px; }
+      .car-slide .hero .impact { font-size: 12.5px; }
+    }
+
     /* ── NOTAMs activos de la estación (MDPC) ── */
     .notam-note { font-size: 12.5px; color: var(--muted); margin-bottom: 10px; line-height: 1.5; }
     .notam-note .notam-disc { opacity: .8; }
