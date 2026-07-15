@@ -300,8 +300,12 @@ ok("salud · conteo de fuentes", "1/21" in htxt)
 
 # ── NOTAMs: clasificación de sujeto/importancia/estado (sin red) ──
 import notams as NT
+from datetime import datetime as _ndt, timedelta as _ntd, timezone as _ntz
+_ntoday = _ndt.now(_ntz.utc)
+# Fechas relativas (ayer → +30 días) para que el NOTAM esté vigente sin caducar con fecha fija.
 nd = NT.normalize({"notam_id": "A1/26", "type": "N", "location": "MDPC",
-                   "effective": "2026-06-01T00:00:00Z", "expiration": "2027-01-01T00:00:00Z",
+                   "effective": (_ntoday - _ntd(days=1)).isoformat(),
+                   "expiration": (_ntoday + _ntd(days=30)).isoformat(),
                    "body": "RWY 08/26 CLSD", "raw": "RWY 08/26 CLSD", "source": "AIS"})
 ok("notam · RWY CLSD = Pista", nd["subject"] == "Pista")
 ok("notam · RWY CLSD = alta importancia", nd["importance"] == "alta")
@@ -327,15 +331,21 @@ _batch = [
 _kept = NT.drop_replaced(_batch)
 ok("notam · reemplazado se elimina del lote", [n["id"] for n in _kept] == ["A205/26"])
 ok("notam · lote sin referencias queda intacto", len(NT.drop_replaced([_batch[0]])) == 1)
-# FAA NOTAM Search (fuente primaria): conversión de su formato al crudo de normalize()
+# FAA NOTAM Search (fuente primaria): conversión de su formato al crudo de normalize().
+# Fechas RELATIVAS (ayer → mañana) para que el NOTAM siempre esté vigente y el test no
+# caduque con una fecha fija (bug del 15 jul 2026: un endDate hardcodeado venció a media corrida).
+from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+_now = _dt.now(_tz.utc)
+_faa_start = (_now - _td(days=1)).strftime("%m/%d/%Y %H%M")
+_faa_end = (_now + _td(days=1)).strftime("%m/%d/%Y %H%M")
 _faa_item = {"notamNumber": "A0250/26", "facilityDesignator": "MDPC",
-             "startDate": "04/22/2026 1000", "endDate": "07/15/2026 2000",
+             "startDate": _faa_start, "endDate": _faa_end,
              "icaoMessage": "A0250/26 NOTAMN\nQ) MDCS/QMPLC/IV/BO/A/000/999\nA) MDPC B) 2604221000",
              "traditionalMessageFrom4thWord": "ACFT STANDS B34 B35 CLSD",
              "cancelledOrExpired": False}
 _fr = NT._faa_to_raw(_faa_item)
 ok("notam-faa · id y cuerpo", _fr["notam_id"] == "A0250/26" and "B34" in _fr["body"])
-ok("notam-faa · fecha convertida a ISO", _fr["effective"].startswith("2026-04-22T10:00"))
+ok("notam-faa · fecha convertida a ISO", _fr["effective"].startswith((_now - _td(days=1)).strftime("%Y-%m-%dT%H:%M")[:13]))
 ok("notam-faa · tipo N extraído del mensaje ICAO", _fr["type"] == "N")
 ok("notam-faa · PERM pasa tal cual", NT._faa_dt("PERM") == "PERM" and NT._faa_dt("") is None)
 _fn = NT.normalize(_fr)
