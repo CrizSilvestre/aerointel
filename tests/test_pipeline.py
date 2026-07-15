@@ -276,6 +276,20 @@ try:
     IA.analyze = _fake_analyze_ok
     done = IA.apply_llm([_mkev_llm(i) for i in range(4)], top=4, pause=0)
     ok("breaker · sin fallos analiza todos", _an_calls["n"] == 4 and done == 4)
+
+    # ── Prioridad de carrusel: solo mejora las historias con "porqué" heurístico ──
+    _an_calls["n"] = 0
+    def _fake_analyze_llm(text, n_sources):
+        _an_calls["n"] += 1
+        r = AN.analyze_heuristic(text, n_sources); r["_llm"] = True   # simula IA exitosa
+        return r
+    IA.analyze = _fake_analyze_llm
+    _c1 = _mkev_llm(1); _c1["analysis"] = {"_llm": True, "impact_score": 60}   # ya tiene IA
+    _c2 = _mkev_llm(2); _c2["analysis"] = AN.analyze_heuristic("Arajet vuelo Punta Cana", 1)  # heurístico
+    up = IA.upgrade_carousel_llm([_c1, _c2], pause=0, adjust=lambda ev: None)
+    ok("carrusel · mejora solo la heurística", up == 1 and _an_calls["n"] == 1)
+    ok("carrusel · la que ya tenía IA se conserva", _c1["analysis"]["_llm"] is True)
+    ok("carrusel · la mejorada queda marcada IA", _c2["analysis"].get("_llm") is True)
 finally:
     IA.analyze = _real_analyze
 

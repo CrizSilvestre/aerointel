@@ -30,7 +30,7 @@ from ingesta import (SOURCES, MAX_AGE_H, gnews_url, fetch, parse_feed, age_hours
                      cluster, canonical)
 from relevancia import is_relevant
 from analisis import analyze_heuristic, apply_ranking_adjustments
-from ia import apply_llm, interpret_notams_llm, _LLM_STATS
+from ia import apply_llm, upgrade_carousel_llm, interpret_notams_llm, _LLM_STATS
 from imagenes import fetch_images_parallel, apply_image_boost
 from clima import fetch_weather
 from salida import to_mattermost, write_briefing, write_dashboard, post, health_payload, EMOJI
@@ -69,9 +69,9 @@ def main():
     events.sort(key=lambda e: e["analysis"]["impact_score"], reverse=True)
 
     # 2) LLM (si hay proveedor) SOLO en los top N → respeta el free tier (rate limits)
+    pause = float(os.environ.get("AEROINTEL_LLM_SLEEP", "2"))
     if prov:
         top = int(os.environ.get("AEROINTEL_LLM_MAX", "20"))
-        pause = float(os.environ.get("AEROINTEL_LLM_SLEEP", "2"))
         done = apply_llm(events, top, pause)
         print(f"  LLM ({prov}): {done}/{min(top, len(events))} eventos analizados por IA (resto heurística).")
 
@@ -90,6 +90,15 @@ def main():
     n_img = int(os.environ.get("AEROINTEL_IMG_N", "48"))
     if os.environ.get("AEROINTEL_NO_IMG", "").lower() not in ("1", "true", "yes"):
         fetch_images_parallel(events, n=n_img)
+        # 4') Prioridad de IA para el CARRUSEL: las historias con foto encabezan la portada y son
+        #     lo primero que se ve. Antes del boost (que replaza el análisis lo perdería), se les
+        #     da 'porqué' de IA a las que quedaron con heurística. Máx = las que muestra el carrusel.
+        if prov:
+            car_max = int(os.environ.get("AEROINTEL_CAROUSEL_MAX", "6"))
+            carousel = [e for e in events if e.get("image_url")][:car_max]
+            up = upgrade_carousel_llm(carousel, pause, apply_ranking_adjustments)
+            if up:
+                print(f"  Carrusel: IA aplicada a {up} historia(s) con foto (prioridad de portada).")
         apply_image_boost(events)          # nota con foto real sube un poco (solo reordena)
 
     # 4b) NOTAMs activos de la estación (MDPC). Server-side; sin clave/sin suscripción → [] y se omite.

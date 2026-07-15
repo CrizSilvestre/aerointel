@@ -253,14 +253,68 @@
     /* ── Nav: SIEMPRE una sola línea (desliza horizontal si no cabe; nunca filas huérfanas).
        Los márgenes auto del primer/último botón centran cuando hay espacio y se anulan
        correctamente al desbordar (a diferencia de justify-content:center). ── */
+
+    /* Contenedor: fondo navy + posición relativa para apilar blob-track y nav */
+    .nav-goo {
+      position: relative;
+      background: var(--navy);
+      overflow: hidden;          /* recorta el blob si sale de rango */
+    }
+
+    /* Capa del blob: DETRÁS de los botones, CON el filtro gooey.
+       Ocupa el mismo espacio que el nav pero no intercepta clics. */
+    .blob-track {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      filter: url(#goo);
+    }
+
+    .nav-blob {
+      position: absolute;
+      top: 3px;
+      height: calc(100% - 3px);
+      background: #fff;
+      border-radius: 10px 10px 0 0;
+      /* Transición con curva snap orgánica */
+      transition: left .4s cubic-bezier(.4, .0, .2, 1),
+                  width .4s cubic-bezier(.4, .0, .2, 1);
+    }
+
+    /* Gotas residuales: bolitas que se "despegan" del blob al cambiar de tab */
+    .nav-blob::before,
+    .nav-blob::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      width: 10px;
+      height: 10px;
+      background: #fff;
+      border-radius: 50%;
+      opacity: 0;
+      transition: opacity .2s, transform .4s cubic-bezier(.4, .0, .2, 1);
+    }
+    .nav-blob::before { left: -6px; }
+    .nav-blob::after  { right: -6px; }
+
+    .nav-blob.moving::before,
+    .nav-blob.moving::after {
+      opacity: 1;
+    }
+    .nav-blob.moving::before { transform: translateX(-4px) scale(.7); }
+    .nav-blob.moving::after  { transform: translateX(4px) scale(.7); }
+
+    /* Nav: capa de los botones, SIN filtro → texto siempre nítido */
     nav.sections {
       display: flex;
       gap: 2px;
       flex-wrap: nowrap;
       overflow-x: auto;
-      background: var(--navy);
+      background: transparent;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
+      position: relative;
+      z-index: 2;
     }
 
     nav.sections::-webkit-scrollbar { display: none; }
@@ -278,10 +332,10 @@
       letter-spacing: .3px;
       flex: 0 0 auto;
       white-space: nowrap;
+      transition: color .3s ease;
     }
 
-    /* Indicador de desborde: cuando hay más pestañas ocultas, el borde se desvanece —
-       el corte se lee como "desliza para ver más", no como un botón roto. */
+    /* Indicador de desborde */
     nav.sections.fade-r {
       -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 36px), transparent);
       mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 36px), transparent);
@@ -298,14 +352,14 @@
     }
 
     nav.sections button:hover {
-      background: var(--navy2);
+      background: rgba(255,255,255,.12);
       color: #fff;
+      border-radius: 8px 8px 0 0;
     }
 
     nav.sections button.active {
-      background: #fff;
       color: var(--navy);
-      border-radius: 7px 7px 0 0;   /* pestaña de periódico: se lee intencional aun en el borde */
+      background: transparent;   /* el blob blanco detrás da la forma */
     }
 
     /* ── Ticker última hora ── */
@@ -1230,16 +1284,19 @@
         display: none;
       }
 
+      /* Masthead compacto en móvil: recupera altura para que el "porqué" del carrusel
+         (lo primero que importa) quepa en pantalla sin que se corte abajo. */
       .masthead {
-        padding: 12px 14px 10px;
+        padding: 9px 14px 8px;
       }
 
       .masthead .owner {
         display: inline-block;     /* fluye como texto: sin cortes raros del flex */
-        font-size: 10.5px;
-        padding: 4px 12px;
+        font-size: 10px;
+        padding: 3px 11px;
+        margin-top: 5px;
         text-align: center;
-        line-height: 1.5;
+        line-height: 1.45;
       }
 
       .masthead .owner-dot {
@@ -1251,7 +1308,8 @@
       .owner-pre { display: none; }   /* "Una herramienta de" sobra en pantalla chica */
 
       .masthead h1 {
-        font-size: 27px;
+        font-size: 23px;
+        margin: 2px 0;
       }
 
       .masthead .kicker {
@@ -1260,7 +1318,9 @@
       }
 
       .masthead .sub {
-        font-size: 11px;
+        font-size: 10.5px;
+        line-height: 1.35;
+        margin-top: 3px;
       }
 
       /* nav: la barra base ya es deslizable en una línea; aquí solo ajustes de tamaño */
@@ -1406,13 +1466,13 @@
 
     /* ── Carrusel: ajustes móviles ── */
     @media(max-width:600px) {
-      /* Imagen más alta proporcionalmente para que no quede una franja delgada */
-      .car-slide .hero .cover { aspect-ratio: 16/10; }
+      /* Imagen con tope de altura: hero atractivo pero sin empujar el "porqué" fuera de vista */
+      .car-slide .hero .cover { aspect-ratio: 16/10; max-height: 190px; }
 
-      /* Título más pequeño y permitir 3 líneas en pantalla angosta */
+      /* Título compacto: 2 líneas (el titular ya es fiel y corto) → deja ver el impacto */
       .car-slide .hero h2 {
-        font-size: 20px; letter-spacing: -.3px;
-        -webkit-line-clamp: 3; min-height: 3.36em;   /* 3 líneas × lh 1.12 */
+        font-size: 20px; letter-spacing: -.3px; margin: 9px 0 6px;
+        -webkit-line-clamp: 2; min-height: 2.24em;   /* 2 líneas × lh 1.12 */
       }
 
       /* Impacto: 3 líneas en móvil (el texto se envuelve más) */
@@ -1522,7 +1582,23 @@
       <div class="owner"><span class="owner-dot"></span><span class="owner-pre">Una herramienta de&nbsp;</span><b>Gestión Operaciones Airside</b>&nbsp;·
         Aeropuerto de Punta Cana (PUJ)</div>
     </div>
-    <nav class="sections" id="nav"></nav>
+    <!-- Filtro SVG gooey: fusiona formas cercanas en una masa orgánica (efecto metaball).
+         stdDeviation controla cuánto se "derriten" los bordes entre el blob y las gotas. -->
+    <svg style="position:absolute;width:0;height:0" aria-hidden="true">
+      <defs>
+        <filter id="goo">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
+          <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="goo" />
+          <feComposite in="SourceGraphic" in2="goo" operator="atop" />
+        </filter>
+      </defs>
+    </svg>
+    <div class="nav-goo">
+      <div class="blob-track">
+        <div class="nav-blob" id="navBlob"></div>
+      </div>
+      <nav class="sections" id="nav"></nav>
+    </div>
     <div class="ticker"><span class="lab">Última hora</span>
       <div class="track" id="ticker"></div>
     </div>
@@ -1880,18 +1956,48 @@
     ...cats.map(c => ['cat:' + c, catOf(c).label])];
     let view = 'portada';
     const nav = document.getElementById('nav');
+    const blob = document.getElementById('navBlob');
+    let blobTimeout;
     NAV.forEach(([k, l]) => {
       const b = document.createElement('button'); b.textContent = l; b.dataset.k = k;
       b.onclick = () => { view = k; render(); window.scrollTo(0, 0); }; nav.appendChild(b);
     });
+
+    // ── Blob líquido: posiciona el indicador detrás del botón activo con efecto gota ──
+    function moveBlob(animate) {
+      const act = nav.querySelector('button.active');
+      if (!act || !blob) return;
+      const width = act.getBoundingClientRect().width;
+      // offsetLeft es relativo al nav (scroll container); restamos scrollLeft
+      // porque el blob-track es absoluto y no se desplaza con el scroll.
+      const left = act.offsetLeft - nav.scrollLeft;
+
+      if (animate) {
+        blob.classList.add('moving');
+        clearTimeout(blobTimeout);
+        blobTimeout = setTimeout(() => blob.classList.remove('moving'), 450);
+      } else {
+        blob.style.transition = 'none';
+        requestAnimationFrame(() => {
+          blob.style.left = left + 'px';
+          blob.style.width = width + 'px';
+          requestAnimationFrame(() => { blob.style.transition = ''; });
+        });
+        return;
+      }
+
+      blob.style.left = left + 'px';
+      blob.style.width = width + 'px';
+    }
+
     // Indicador de desborde del nav: desvanece el borde por donde hay pestañas ocultas.
     function navFade() {
       nav.classList.toggle('fade-l', nav.scrollLeft > 4);
       nav.classList.toggle('fade-r', nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 4);
     }
-    nav.addEventListener('scroll', navFade, { passive: true });
-    window.addEventListener('resize', navFade);
-    setInterval(navFade, 800);   // respaldo: garantiza el indicador aunque algún evento se pierda
+    nav.addEventListener('scroll', () => { navFade(); moveBlob(false); }, { passive: true });
+    window.addEventListener('resize', () => { navFade(); moveBlob(false); });
+    setInterval(navFade, 800);
     navFade();
 
     const sevName = s => s === 'crítico' ? 'Última hora' : s === 'importante' ? 'Actualización' : 'Info';
@@ -2101,14 +2207,18 @@
       carTimer = setInterval(() => { if (!paused && !document.hidden) go(idx + 1); }, 8500);
     }
 
+    let firstRender = true;
     function render() {
-      [...nav.children].forEach(b => b.classList.toggle('active', b.dataset.k === view));
+      [...nav.children].forEach(b => { if (b.dataset.k) b.classList.toggle('active', b.dataset.k === view); });
+      // Mover el blob líquido al botón activo (anima si no es la primera carga)
+      moveBlob(!firstRender);
+      firstRender = false;
       // Centrar la pestaña activa dentro de la barra: así nunca queda bajo el degradado de
       // desborde (que sobre el bloque BLANCO del activo se veía como si se deshiciera en móvil).
       const act = nav.querySelector('button.active');
       if (act) {
         const target = act.offsetLeft - (nav.clientWidth - act.offsetWidth) / 2;
-        nav.scrollLeft = Math.max(0, Math.min(target, nav.scrollWidth - nav.clientWidth));
+        nav.scrollTo({ left: Math.max(0, Math.min(target, nav.scrollWidth - nav.clientWidth)), behavior: firstRender ? 'auto' : 'smooth' });
         navFade();
       }
       const main = document.getElementById('main');

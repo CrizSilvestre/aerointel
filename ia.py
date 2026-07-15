@@ -142,11 +142,16 @@ def analyze(text, n_sources):
         prov = "anthropic"
     if prov:
         try:
+            r = None
             if prov == "anthropic":
-                return analyze_anthropic(text)
-            if prov in OPENAI_PROVIDERS:
-                return analyze_openai_compatible(text, prov)
-            print(f"   (proveedor LLM '{prov}' no reconocido — uso heurística)")
+                r = analyze_anthropic(text)
+            elif prov in OPENAI_PROVIDERS:
+                r = analyze_openai_compatible(text, prov)
+            else:
+                print(f"   (proveedor LLM '{prov}' no reconocido — uso heurística)")
+            if r is not None:
+                r["_llm"] = True          # marca: análisis real de IA (no heurística de respaldo)
+                return r
         except Exception as e:
             _LLM_STATS["fallbacks"] += 1
             print(f"   (LLM falló tras {LLM_RETRIES} intentos, uso heurística: {e})")
@@ -172,6 +177,29 @@ def apply_llm(events, top, pause):
         else:
             done += 1
             consec = 0
+        time.sleep(pause)
+    return done
+
+def upgrade_carousel_llm(carousel_events, pause, adjust):
+    """Las historias del CARRUSEL (las de foto) son lo PRIMERO que ve una persona, así que su
+    'porqué' no puede ser texto heurístico genérico. Aquí se les da análisis de IA a las que
+    quedaron con heurística (las que ya lo tienen se saltan). `adjust` = apply_ranking_adjustments,
+    que se reaplica UNA vez sobre el análisis nuevo. Devuelve cuántas se mejoraron."""
+    done = consec = 0
+    for ev in carousel_events:
+        if ev["analysis"].get("_llm"):
+            continue                                   # ya tiene IA → no gastar otra llamada
+        before = _LLM_STATS["fallbacks"]
+        fresh = analyze(ev["_txt"], len(ev["items"]))
+        if fresh.get("_llm"):
+            ev["analysis"] = fresh
+            adjust(ev)                                 # una sola pasada de ajustes sobre lo nuevo
+            done += 1
+            consec = 0
+        elif _LLM_STATS["fallbacks"] > before:
+            consec += 1
+            if consec >= LLM_BREAKER:
+                break                                  # cuota agotada → dejar el resto heurístico
         time.sleep(pause)
     return done
 
