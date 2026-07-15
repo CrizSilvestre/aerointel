@@ -305,6 +305,7 @@
     nav.sections button.active {
       background: #fff;
       color: var(--navy);
+      border-radius: 7px 7px 0 0;   /* pestaña de periódico: se lee intencional aun en el borde */
     }
 
     /* ── Ticker última hora ── */
@@ -2102,6 +2103,14 @@
 
     function render() {
       [...nav.children].forEach(b => b.classList.toggle('active', b.dataset.k === view));
+      // Centrar la pestaña activa dentro de la barra: así nunca queda bajo el degradado de
+      // desborde (que sobre el bloque BLANCO del activo se veía como si se deshiciera en móvil).
+      const act = nav.querySelector('button.active');
+      if (act) {
+        const target = act.offsetLeft - (nav.clientWidth - act.offsetWidth) / 2;
+        nav.scrollLeft = Math.max(0, Math.min(target, nav.scrollWidth - nav.clientWidth));
+        navFade();
+      }
       const main = document.getElementById('main');
       const tc = document.getElementById('timecount');
 
