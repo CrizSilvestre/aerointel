@@ -32,6 +32,18 @@
     html, body { overflow-x: hidden; }
     @supports (overflow-x: clip) { html, body { overflow-x: clip; } }
 
+    /* Candados específicos de Safari iOS (los dos reportes reales del teléfono):
+       1) touch-action manipulation: mata el ZOOM POR DOBLE TAP — tocar flechas/dots del
+          carrusel dos veces seguidas agrandaba la página y aparecía la franja blanca.
+          El pinch-zoom de accesibilidad sigue funcionando.
+       2) text-size-adjust 100%: Safari infla tamaños de fuente por su cuenta y desbordaba
+          el texto de las cajas de altura exacta (el "porqué" desparramado en el impacto). */
+    html {
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+    body { touch-action: manipulation; }
+
     body {
       margin: 0;
       background-color: var(--bg);
