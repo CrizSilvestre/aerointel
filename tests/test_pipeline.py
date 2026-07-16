@@ -205,6 +205,19 @@ ok("porqué · mención directa PUJ = impacto directo", "directamente a puj" in 
 tur = AN.analyze_heuristic("Turismo: RD recibió 6.6 millones de visitantes en el primer semestre, informa Air France", 1)
 ok("porqué · cifra de visitantes = demanda", "demanda" in tur["angulo_editorial"].lower())
 
+# ── Editorial tecnología/regulatorio: sin subcadenas fantasma (bug del 16 jul) ──
+# 'saf' dentro de 'desafío' inventaba lectura de combustibles sostenibles
+tec = AN.analyze_heuristic("El desafío tecnológico del aeropuerto avanza según lo previsto", 1)
+ok("porqué · 'desafío' NO es SAF", "SAF" not in tec["angulo_editorial"])
+saf = AN.analyze_heuristic("Airline expands SAF sustainable aviation fuel program", 1)
+ok("porqué · SAF real SÍ es SAF", "SAF" in saf["angulo_editorial"])
+# Sistemas TI aeroportuarios (facturación/check-in): evento operativo inmediato, no tendencia
+ti = AN.analyze_heuristic("Aeropuerto de Punta Cana reanuda la facturación en la terminal A tras avería tecnológica", 1)
+ok("porqué · facturación/TI = lectura operativa", "sistemas TI" in ti["angulo_editorial"] and "mediano plazo" not in ti["angulo_editorial"])
+# 'faa' dentro de 'Rafaela' inventaba "Acción regulatoria de FAA"
+reg = AN.analyze_heuristic("Nueva regulación aérea beneficia a la empresa Rafaela en su expansión de aviación", 1)
+ok("porqué · 'Rafaela' NO es FAA", "FAA" not in reg["angulo_editorial"])
+
 # ── Resiliencia LLM: backoff + reintentos (sin red: urlopen simulado) ──
 ok("backoff · exponencial 2/6/18", (IA._retry_delay(0), IA._retry_delay(1), IA._retry_delay(2)) == (2.0, 6.0, 18.0))
 ok("backoff · respeta Retry-After", IA._retry_delay(0, "7") == 7.0)

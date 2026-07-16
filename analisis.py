@@ -139,7 +139,7 @@ def _build_editorial(cat, sev, text, airlines, puj, ctx):
             event = "retrasos operativos"
         elif any(k in tl for k in ["ground stop"]):
             event = "ground stop"
-        elif any(k in tl for k in ["divert", "desvi"]):
+        elif any(k in tl for k in ["divert", "desvi", "desví"]):
             event = "desvíos de vuelos"
         elif labor_strike:
             event = "huelga/paro laboral"
@@ -189,15 +189,16 @@ def _build_editorial(cat, sev, text, airlines, puj, ctx):
         return "; ".join(parts) + "."
 
     elif cat == "regulatorio":
-        if any(k in tl for k in ["faa"]):
+        # Siglas con LÍMITE DE PALABRA: 'faa' como subcadena matchea 'raFAAela', etc.
+        if re.search(r"\bfaa\b", tl):
             body_name = "FAA"
-        elif any(k in tl for k in ["easa"]):
+        elif re.search(r"\beasa\b", tl):
             body_name = "EASA"
-        elif any(k in tl for k in ["ntsb"]):
+        elif re.search(r"\bntsb\b", tl):
             body_name = "NTSB"
-        elif any(k in tl for k in ["idac"]):
+        elif re.search(r"\bidac\b", tl):
             body_name = "IDAC"
-        elif any(k in tl for k in ["icao"]):
+        elif re.search(r"\bicao\b|\boaci\b", tl):
             body_name = "ICAO"
         else:
             body_name = ""
@@ -250,12 +251,25 @@ def _build_editorial(cat, sev, text, airlines, puj, ctx):
         return "; ".join(parts) + "."
 
     elif cat == "tecnologia":
+        # Sistemas TI aeroportuarios (facturación/check-in caídos o restablecidos): es un evento
+        # OPERATIVO inmediato — filas, mostradores, tiempos de proceso — no una tendencia.
+        if re.search(r"factur|check-?in|outage|ca[ií]da de[l]? sistema|aver[ií]a|restablec|reanuda|"
+                     r"system (failure|glitch)|it system", tl):
+            parts = ["Incidencia/restablecimiento de sistemas TI aeroportuarios"]
+            if places_str:
+                parts.append(f"en {places_str}")
+            if air_str:
+                parts.append(f"aerolíneas afectadas: {air_str}")
+            parts.append("impacto directo en el procesamiento de pasajeros — monitorear mostradores, filas y tiempos de proceso")
+            return "; ".join(parts) + "."
+        # OJO: límite de palabra para 'saf' — como subcadena matchea 'deSAFío'/'SAFety' y generaba
+        # lecturas absurdas de "combustibles sostenibles" en notas que no hablaban de eso.
         parts = ["Avance tecnológico en aviación"]
-        if any(k in tl for k in ["saf", "sustainab", "sostenib"]):
+        if re.search(r"\bsaf\b|sustainab|sostenib", tl):
             parts = ["Desarrollo en combustibles sostenibles (SAF)"]
-        elif any(k in tl for k in ["evtol", "electric", "eléctric"]):
+        elif re.search(r"\bevtol\b|electric|eléctric", tl):
             parts = ["Avance en aviación eléctrica/eVTOL"]
-        elif any(k in tl for k in ["drone"]):
+        elif "drone" in tl:
             parts = ["Desarrollo en tecnología de drones"]
         if air_str:
             parts.append(f"involucra a {air_str}")

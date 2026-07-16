@@ -21,11 +21,13 @@ KW = {
                     "close call", "near miss", "near-miss", "go-around", "go around", "loss of separation",
                     "tcas", "bird strike", "hard landing", "tail strike", "runway excursion", "rejected takeoff",
                     "accidente", "incidente", "emergencia", "cuasi accidente"],
-    "operaciones": ["delay", "cancel", "strike", "ground stop", "divert", "notam", "retraso", "cancela", "huelga", "desvi", "paro"],
+    "operaciones": ["delay", "cancel", "strike", "ground stop", "divert", "notam", "retraso", "cancela", "huelga", "desvi", "desví", "paro"],
     "regulatorio": ["faa", "easa", "ntsb", "icao", "iata", "idac", "regulat", "directive", "certif", "ban", "suspend", "regul"],
     "industria":   ["order", "delivery", "airbus", "boeing", "embraer", "merger", "earnings", "financ", "pedido", "entrega", "fusión"],
+    # OJO acentos: los prefijos NO cubren la variante acentuada si el acento cae dentro del
+    # prefijo ('tecnolog' no matchea 'tecnológica'; 'desvi' no matchea 'desvío') → ambas formas.
     "tecnologia":  ["evtol", "saf", "sustainable aviation fuel", "sustainab", "electric aircraft", "hydrogen",
-                    "drone", "uav", "tecnolog", "sostenib", "biocombustible"],
+                    "drone", "uav", "tecnolog", "tecnológ", "sostenib", "biocombustible"],
 }
 AVIATION = ["aviation", "airline", "airport", "flight", "aircraft", "aerol", "aeropuerto", "vuelo", "avión", "aviaci", "airbus", "boeing", "jet", "carrier"]
 CRIT = ["crash", "accident", "emergency", "mayday", "evacuat", "hurricane", "ground stop", "huracán", "accidente", "emergencia"]
