@@ -132,7 +132,12 @@ def _build_editorial(cat, sev, text, airlines, puj, ctx):
     elif cat == "operaciones":
         # OJO: "strike" solo es huelga si NO es 'bird/lightning/tail strike' (esos son seguridad);
         # y el desvío/ground stop se evalúa ANTES para no confundir el evento principal.
-        labor_strike = bool(re.search(r"\bhuelga\b|\bparo\b|(?<!bird )(?<!lightning )(?<!tail )(?<!wildlife )strike\b", tl))
+        # 'strike' solo es huelga si no es bird/lightning/tail strike NI vocabulario militar
+        # ('strike fighter/range/group…': el F/A-18 no está en huelga).
+        labor_strike = bool(re.search(
+            r"\bhuelga\b|\bparo\b|"
+            r"(?<!bird )(?<!lightning )(?<!tail )(?<!wildlife )(?<!air)strike\b"
+            r"(?!\s+(?:fighter|group|aircraft|carrier|force|range|capabilit|mission|wing|eagle))", tl))
         if any(k in tl for k in ["cancel", "cancela"]):
             event = "cancelaciones"
         elif any(k in tl for k in ["delay", "retraso"]):

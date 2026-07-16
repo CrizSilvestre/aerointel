@@ -178,6 +178,10 @@ ok("porqué · lightning strike ≠ huelga", "huelga" not in lx["angulo_editoria
 ok("porqué · lightning strike = desvío", "desvío" in lx["angulo_editorial"].lower() or "desvi" in lx["angulo_editorial"].lower())
 hs = AN.analyze_heuristic("Air Canada workers strike grounds flights at Toronto Pearson", 1)
 ok("porqué · huelga real SÍ se detecta", "huelga" in hs["angulo_editorial"].lower())
+mil = AN.analyze_heuristic("The Autonomous Tanker That Will Free The F/A-18 Super Hornet Strike Fighter Fleet", 1)
+ok("porqué · 'Strike Fighter' militar NO es huelga", "huelga" not in mil["angulo_editorial"].lower())
+mil2 = AN.analyze_heuristic("MQ-25 Stingray could double the carrier air wing's strike range by freeing Super Hornets", 1)
+ok("porqué · 'strike range' militar NO es huelga", "huelga" not in mil2["angulo_editorial"].lower())
 # 2. Historia de recuperación ≠ alerta activa; severidad baja de crítico
 rb = AN.analyze_heuristic("Jamaica's Aviation Sector Rebounds After Hurricane Melissa as Government Projects Growth", 1)
 ok("porqué · rebote = recuperación, no alerta", "recuperaci" in rb["angulo_editorial"].lower() and "alerta por" not in rb["angulo_editorial"].lower())
