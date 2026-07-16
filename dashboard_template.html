@@ -254,57 +254,33 @@
        Los márgenes auto del primer/último botón centran cuando hay espacio y se anulan
        correctamente al desbordar (a diferencia de justify-content:center). ── */
 
-    /* Contenedor: fondo navy + posición relativa para apilar blob-track y nav */
-    .nav-goo {
+    /* Contenedor: fondo navy + posición relativa para apilar el indicador y el nav */
+    .nav-bar {
       position: relative;
       background: var(--navy);
-      overflow: hidden;          /* recorta el blob si sale de rango */
+      overflow: hidden;          /* recorta el indicador si sale de rango */
     }
 
-    /* Capa del blob: DETRÁS de los botones, CON el filtro gooey.
-       Ocupa el mismo espacio que el nav pero no intercepta clics. */
+    /* Capa del indicador: DETRÁS de los botones. Mismo espacio que el nav, sin interceptar clics. */
     .blob-track {
       position: absolute;
       inset: 0;
       pointer-events: none;
-      filter: url(#goo);
     }
 
+    /* Indicador DESLIZANTE: pestaña blanca redondeada que se desliza entre selecciones
+       (limpio y profesional — sin efecto gota). */
     .nav-blob {
       position: absolute;
       top: 3px;
       height: calc(100% - 3px);
       background: #fff;
-      border-radius: 10px 10px 0 0;
-      /* Transición con curva snap orgánica */
-      transition: left .4s cubic-bezier(.4, .0, .2, 1),
-                  width .4s cubic-bezier(.4, .0, .2, 1);
+      border-radius: 7px 7px 0 0;
+      transition: left .32s cubic-bezier(.33, .0, .2, 1),
+                  width .32s cubic-bezier(.33, .0, .2, 1);
     }
 
-    /* Gotas residuales: bolitas que se "despegan" del blob al cambiar de tab */
-    .nav-blob::before,
-    .nav-blob::after {
-      content: '';
-      position: absolute;
-      bottom: 0;
-      width: 10px;
-      height: 10px;
-      background: #fff;
-      border-radius: 50%;
-      opacity: 0;
-      transition: opacity .2s, transform .4s cubic-bezier(.4, .0, .2, 1);
-    }
-    .nav-blob::before { left: -6px; }
-    .nav-blob::after  { right: -6px; }
-
-    .nav-blob.moving::before,
-    .nav-blob.moving::after {
-      opacity: 1;
-    }
-    .nav-blob.moving::before { transform: translateX(-4px) scale(.7); }
-    .nav-blob.moving::after  { transform: translateX(4px) scale(.7); }
-
-    /* Nav: capa de los botones, SIN filtro → texto siempre nítido */
+    /* Nav: capa de los botones, siempre nítida */
     nav.sections {
       display: flex;
       gap: 2px;
@@ -1582,18 +1558,7 @@
       <div class="owner"><span class="owner-dot"></span><span class="owner-pre">Una herramienta de&nbsp;</span><b>Gestión Operaciones Airside</b>&nbsp;·
         Aeropuerto de Punta Cana (PUJ)</div>
     </div>
-    <!-- Filtro SVG gooey: fusiona formas cercanas en una masa orgánica (efecto metaball).
-         stdDeviation controla cuánto se "derriten" los bordes entre el blob y las gotas. -->
-    <svg style="position:absolute;width:0;height:0" aria-hidden="true">
-      <defs>
-        <filter id="goo">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
-          <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7" result="goo" />
-          <feComposite in="SourceGraphic" in2="goo" operator="atop" />
-        </filter>
-      </defs>
-    </svg>
-    <div class="nav-goo">
+    <div class="nav-bar">
       <div class="blob-track">
         <div class="nav-blob" id="navBlob"></div>
       </div>
@@ -1957,25 +1922,24 @@
     let view = 'portada';
     const nav = document.getElementById('nav');
     const blob = document.getElementById('navBlob');
-    let blobTimeout;
     NAV.forEach(([k, l]) => {
       const b = document.createElement('button'); b.textContent = l; b.dataset.k = k;
       b.onclick = () => { view = k; render(); window.scrollTo(0, 0); }; nav.appendChild(b);
     });
 
-    // ── Blob líquido: posiciona el indicador detrás del botón activo con efecto gota ──
+    // ── Indicador deslizante: la pestaña blanca se desliza detrás del botón activo. Al cambiar
+    //    de tab (animate=true) usa la transición CSS; al hacer scroll/resize (animate=false) sigue
+    //    al vuelo sin animar, para que no "flote" desfasado del botón. ──
     function moveBlob(animate) {
       const act = nav.querySelector('button.active');
       if (!act || !blob) return;
       const width = act.getBoundingClientRect().width;
-      // offsetLeft es relativo al nav (scroll container); restamos scrollLeft
-      // porque el blob-track es absoluto y no se desplaza con el scroll.
+      // offsetLeft es relativo al nav (scroll container); restamos scrollLeft porque el
+      // blob-track es absoluto y no se desplaza con el scroll.
       const left = act.offsetLeft - nav.scrollLeft;
-
       if (animate) {
-        blob.classList.add('moving');
-        clearTimeout(blobTimeout);
-        blobTimeout = setTimeout(() => blob.classList.remove('moving'), 450);
+        blob.style.left = left + 'px';
+        blob.style.width = width + 'px';
       } else {
         blob.style.transition = 'none';
         requestAnimationFrame(() => {
@@ -1983,11 +1947,7 @@
           blob.style.width = width + 'px';
           requestAnimationFrame(() => { blob.style.transition = ''; });
         });
-        return;
       }
-
-      blob.style.left = left + 'px';
-      blob.style.width = width + 'px';
     }
 
     // Indicador de desborde del nav: desvanece el borde por donde hay pestañas ocultas.
@@ -2210,7 +2170,7 @@
     let firstRender = true;
     function render() {
       [...nav.children].forEach(b => { if (b.dataset.k) b.classList.toggle('active', b.dataset.k === view); });
-      // Mover el blob líquido al botón activo (anima si no es la primera carga)
+      // Deslizar el indicador al botón activo (anima si no es la primera carga)
       moveBlob(!firstRender);
       firstRender = false;
       // Centrar la pestaña activa dentro de la barra: así nunca queda bajo el degradado de
