@@ -32,6 +32,13 @@ ok("relevante · ciclón en el Caribe sí", REL.is_relevant("Hurricane approache
 ok("relevante · RD sí", REL.is_relevant("El aeropuerto de Punta Cana amplía operaciones"))
 ok("relevante · 'jet' en 'objetivo' NO es aviación", not REL.is_relevant("El Gobierno tiene como objetivo elevar la inversión en fertilizantes"))
 ok("relevante · 'faa' en 'rafaela' NO es aviación", not REL.is_relevant("La empresa Rafaela anunció nuevos empleos"))
+# Regresión AIRD (bug real): 'puj' minúscula dentro de 'Pujols' NO es el aeropuerto
+ok("relevante · 'Pujols' NO es PUJ", not REL.is_relevant(
+    "La AIRD propone cambios al Código Penal, afirmó Mario Pujols, vicepresidente de la entidad"))
+ok("relevante · 'vuelo a PUJ' en mayúsculas SÍ", REL.is_relevant("Aerolínea anuncia vuelo a PUJ desde Bogotá"))
+# Aniversarios/reseñas históricas = recap (no breaking)
+ok("recap · aniversario detectado", bool(REL.RECAP_RE.search("25 years since the Concorde crash that changed aviation")))
+ok("recap · 'anniversary' detectado", bool(REL.RECAP_RE.search("Airline marks anniversary of first flight")))
 # Flexibilidad meteo: clima que afecta a RD entra (afecta ops de PUJ); ambiguos/EEUU no.
 ok("relevante · vaguada en RD entra", REL.is_relevant("Vaguada provoca aguaceros en República Dominicana"))
 ok("relevante · ONAMET alerta entra", REL.is_relevant("ONAMET emite alerta amarilla para varias provincias"))
@@ -350,6 +357,10 @@ ok("notam · lectura de RWY CLSD menciona pista", "pista" in NT.interpret_heuris
 ok("notam · lectura ILS U/S menciona servicio", "servicio" in NT.interpret_heuristic({"subject": "Ayuda a navegación", "body": "ILS RWY 08 GP U/S"}).lower())
 # Fuente con enlace en cada NOTAM (como las noticias); el scope ya no se disfraza de fuente.
 ok("notam · fuente explícita se respeta", nd["source"] == "AIS")
+# Etiqueta CIERRE: los NOTAM con CLSD/CLOSED se marcan (pista, rodaje, plataforma…)
+ok("notam · CLSD marca cierre", nd["cierre"] is True)
+ok("notam · sin CLSD no marca cierre", NT.normalize({"raw": "ILS RWY 08 GP U/S"})["cierre"] is False)
+ok("notam · stands CLSD marca cierre", NT.normalize({"raw": "ACFT STANDS N6 N7 CLSD"})["cierre"] is True)
 ok("notam · fuente por defecto = AIS/IDAC", NT.normalize({"raw": "TWY C WIP", "scope": "A"})["source"] == NT.SOURCE_NAME)
 ok("notam · source_url presente", NT.normalize({"raw": "TWY C WIP"})["source_url"].startswith("https://"))
 ok("notam · scope separado de la fuente", NT.normalize({"raw": "TWY C WIP", "scope": "A"})["scope"] == "Aeródromo")

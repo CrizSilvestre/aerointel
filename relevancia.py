@@ -152,17 +152,19 @@ AVIATION_RE = re.compile(
     r"\bpista\b|\bdespegu|\baterriz|\bslot\b|\bhandling|\brampa\b|terminal a[eé]re|aviaci[oó]n civil|"
     r"civil aviation|\bicao\b|\biata\b|\bfaa\b|\beasa\b|\btripulaci|\bcockpit|\bfuselaje|\bairspace|"
     r"espacio a[eé]reo", re.I)
-DR_AIRPORT_CODES = [" puj", "puj ", " sdq", "sdq ", " sti ", " pop ", " azs ", " lrm "]
+# Códigos IATA/OACI de aeropuertos RD como señal de aviación: SOLO en MAYÚSCULAS y como
+# palabra completa — 'puj' minúscula dentro de 'Pujols' (apellido) NO es el aeropuerto.
+# (Bug real: una nota de la AIRD sobre el Código Penal entró por "Mario Pujols".)
+DR_AIRPORT_CODES_RE = re.compile(r"\b(PUJ|SDQ|STI|POP|AZS|LRM|MDPC|MDSD|MDST|MDPP)\b")
 
 
 def is_relevant(text):
     t = text or ""
-    tl = t.lower()
     if AVIATION_RE.search(t):
         return True
     if detect_airlines(t):
         return True
-    if any(c in tl for c in DR_AIRPORT_CODES):       # códigos IATA de aeropuertos RD = contexto aviación
+    if DR_AIRPORT_CODES_RE.search(t):                # códigos IATA de aeropuertos RD = contexto aviación
         return True
     # Clima que afecta a RD/Caribe entra como meteo (afecta operaciones de PUJ aunque no diga "avión").
     if WX_RE.search(t) and dr_tier(t) is not None:
@@ -189,7 +191,8 @@ PUJ_DIRECT_RE = re.compile(r"(?i:punta\s?cana)|\bPUJ\b|\bMDPC\b")
 
 RECAP_RE = re.compile(r"\b(recap|roundup|round-up|explained|timeline|what we know|in photos|"
                       r"cronolog|resumen del|a look back|year in review|"
-                      r"new book|nuevo libro|book examines|book review|memoir|documentary|documental)\b", re.I)
+                      r"new book|nuevo libro|book examines|book review|memoir|documentary|documental|"
+                      r"anniversary|aniversario|years? (?:since|after|ago)|años (?:del|de la|después))\b", re.I)
 
 # Contenido RUTINARIO / NO OPERACIONAL: pronóstico diario (temperatura/probabilidad de lluvia)
 # y noticias de asistencia social post-evento (bonos, subsidios). Se hunden bajo el umbral;

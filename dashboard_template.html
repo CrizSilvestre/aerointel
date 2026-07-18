@@ -1518,6 +1518,8 @@
     .notam-card .nstat.vigente { background: #1faf6a; color: #fff; }
     .notam-card .nstat.programado { background: #ffd54a; color: #5a4500; }
     .notam-card .nhigh { font-size: 9.5px; font-weight: 800; background: var(--crit); color: #fff; border-radius: 3px; padding: 2px 6px; letter-spacing: .4px; margin-left: auto; }
+    /* Etiqueta CIERRE: pista/rodaje/plataforma/aeródromo cerrado — lo primero a distinguir */
+    .notam-card .nclosed { font-size: 9.5px; font-weight: 800; background: #7e1420; color: #fff; border-radius: 3px; padding: 2px 6px; letter-spacing: .5px; text-transform: uppercase; }
     .notam-card .nsched { font-size: 11.5px; color: var(--muted); margin-bottom: 6px; }
     .notam-card .nsched b { color: var(--ink); }
     /* Lectura legible = contenido principal; el texto crudo se colapsa (ver más abajo). */
@@ -2088,6 +2090,7 @@
           <span class="nid">${esc(n.id)}</span>
           <span class="nsub">${esc(n.subject)}</span>
           <span class="nstat ${liveStatus}">${statusES}</span>
+          ${n.cierre ? '<span class="nclosed">Cierre</span>' : ''}
           ${imp ? '<span class="nhigh">Alta</span>' : ''}
         </div>
         <div class="nsched">Vigencia: <b>${sched}</b> (hora RD)${n.tipo ? ` · ${esc(n.tipo)}` : ''}</div>

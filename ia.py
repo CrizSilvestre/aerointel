@@ -181,10 +181,10 @@ def apply_llm(events, top, pause):
     return done
 
 def upgrade_carousel_llm(carousel_events, pause, adjust):
-    """Las historias del CARRUSEL (las de foto) son lo PRIMERO que ve una persona, así que su
-    'porqué' no puede ser texto heurístico genérico. Aquí se les da análisis de IA a las que
-    quedaron con heurística (las que ya lo tienen se saltan). `adjust` = apply_ranking_adjustments,
-    que se reaplica UNA vez sobre el análisis nuevo. Devuelve cuántas se mejoraron."""
+    """Pase de IA en ORDEN DE PRIORIDAD (main() manda el carrusel primero, luego el top):
+    analiza con LLM cada evento que siga en heurística (los que ya tienen IA se saltan),
+    reaplica `adjust` (apply_ranking_adjustments) UNA vez sobre el análisis nuevo, y corta
+    con el cortacircuito si la cuota muere. Devuelve cuántos quedaron con IA real."""
     done = consec = 0
     for ev in carousel_events:
         if ev["analysis"].get("_llm"):

@@ -30,7 +30,7 @@ from ingesta import (SOURCES, MAX_AGE_H, gnews_url, fetch, parse_feed, age_hours
                      cluster, canonical)
 from relevancia import is_relevant
 from analisis import analyze_heuristic, apply_ranking_adjustments
-from ia import apply_llm, upgrade_carousel_llm, interpret_notams_llm, _LLM_STATS
+from ia import upgrade_carousel_llm, interpret_notams_llm, _LLM_STATS
 from imagenes import fetch_images_parallel, apply_image_boost
 from clima import fetch_weather
 from salida import to_mattermost, write_briefing, write_dashboard, post, health_payload, EMOJI
@@ -68,38 +68,38 @@ def main():
         ev["analysis"] = analyze_heuristic(ev["_txt"], len(ev["items"]), ev["dt"])
     events.sort(key=lambda e: e["analysis"]["impact_score"], reverse=True)
 
-    # 2) LLM (si hay proveedor) SOLO en los top N → respeta el free tier (rate limits)
-    pause = float(os.environ.get("AEROINTEL_LLM_SLEEP", "2"))
-    if prov:
-        top = int(os.environ.get("AEROINTEL_LLM_MAX", "20"))
-        done = apply_llm(events, top, pause)
-        print(f"  LLM ({prov}): {done}/{min(top, len(events))} eventos analizados por IA (resto heurística).")
-
-    # 3) ajustes finales unificados: recencia + ruido + recaps + piso del núcleo RD
+    # 2) ajustes deterministas (recencia/ruido/recap/piso RD) + filtro de publicación,
+    #    todo sobre la heurística — así sabemos QUÉ se publica antes de gastar un token.
     for ev in events:
         apply_ranking_adjustments(ev)
     events.sort(key=lambda e: e["analysis"]["impact_score"], reverse=True)
-
-    # filtro de relevancia: descarta lo de bajo valor (turismo/marketing/sin impacto operacional)
     MIN_SCORE = int(os.environ.get("AEROINTEL_MIN_SCORE", "30"))
     n_before = len(events)
     events = [e for e in events if e["analysis"]["impact_score"] >= MIN_SCORE]
     print(f"  Relevancia (score ≥ {MIN_SCORE}): {n_before} → {len(events)} eventos publicables.")
 
-    # 4) extracción de imágenes en paralelo (solo las notas visibles / top-N)
+    # 3) imágenes en paralelo (define quién va al carrusel)
+    pause = float(os.environ.get("AEROINTEL_LLM_SLEEP", "2"))
     n_img = int(os.environ.get("AEROINTEL_IMG_N", "48"))
     if os.environ.get("AEROINTEL_NO_IMG", "").lower() not in ("1", "true", "yes"):
         fetch_images_parallel(events, n=n_img)
-        # 4') Prioridad de IA para el CARRUSEL: las historias con foto encabezan la portada y son
-        #     lo primero que se ve. Antes del boost (que replaza el análisis lo perdería), se les
-        #     da 'porqué' de IA a las que quedaron con heurística. Máx = las que muestra el carrusel.
-        if prov:
-            car_max = int(os.environ.get("AEROINTEL_CAROUSEL_MAX", "6"))
-            carousel = [e for e in events if e.get("image_url")][:car_max]
-            up = upgrade_carousel_llm(carousel, pause, apply_ranking_adjustments)
-            if up:
-                print(f"  Carrusel: IA aplicada a {up} historia(s) con foto (prioridad de portada).")
-        apply_image_boost(events)          # nota con foto real sube un poco (solo reordena)
+
+    # 4) IA con PRIORIDAD DE PORTADA: el carrusel es lo primero que ve una persona, así que
+    #    los PRIMEROS tokens del presupuesto van a sus historias; después el top por impacto.
+    #    Si la cuota muere a mitad de la corrida, lo más visible ya quedó con análisis de IA.
+    if prov:
+        top = int(os.environ.get("AEROINTEL_LLM_MAX", "20"))
+        car_max = int(os.environ.get("AEROINTEL_CAROUSEL_MAX", "6"))
+        carousel = [e for e in events[:30] if e.get("image_url")][:car_max]
+        car_set = set(map(id, carousel))
+        queue = (carousel + [e for e in events if id(e) not in car_set])[:top]
+        done = upgrade_carousel_llm(queue, pause, apply_ranking_adjustments)
+        print(f"  IA ({prov}): {done}/{len(queue)} eventos analizados — carrusel primero, luego el top.")
+        events.sort(key=lambda e: e["analysis"]["impact_score"], reverse=True)
+        # la IA puede bajar un score bajo el umbral → segundo filtro (barato) para coherencia
+        events = [e for e in events if e["analysis"]["impact_score"] >= MIN_SCORE]
+
+    apply_image_boost(events)              # nota con foto real sube un poco (solo reordena)
 
     # 4b) NOTAMs activos de la estación (MDPC). Server-side; sin clave/sin suscripción → [] y se omite.
     notam_list, notam_err = notams.fetch_notams()

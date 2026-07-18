@@ -153,12 +153,16 @@ def normalize(n, now=None):
     body = (n.get("body") or "").strip()
     raw = (n.get("raw") or "").strip()
     subject, importance = classify(body + " " + raw)
+    # CIERRE explícito: pista/rodaje/plataforma/aeródromo cerrado (CLSD/CLOSED). Etiqueta
+    # visible en el dashboard — es lo primero que un operador quiere distinguir de un vistazo.
+    cierre = bool(re.search(r"\bCLSD\b|\bCLOSED\b|\bAP CLSD\b", (body + " " + raw).upper()))
     return {
         "id": n.get("notam_id") or n.get("notam_id_domestic") or "—",
         "tipo": _TYPE_ES.get((n.get("type") or "").upper(), n.get("type") or ""),
         "location": n.get("location") or "",
         "subject": subject,
         "importance": importance,
+        "cierre": cierre,
         "status": status,
         "effective": eff.isoformat() if eff else None,
         "expiration": exp.isoformat() if exp else None,
