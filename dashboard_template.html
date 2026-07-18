@@ -1414,9 +1414,12 @@
 
     /* Flechas DENTRO de la foto: ocultas hasta que el mouse entra; semitransparentes encima
        de la imagen, centradas verticalmente sobre ella (el overlay replica su aspect-ratio). */
+    /* Capa de flechas: cubre EXACTAMENTE la foto (altura fijada por JS = alto real del .cover).
+       Antes usaba aspect-ratio 16/8 y calculaba mal su ancho (quedaba en ~384px y la flecha
+       derecha flotaba fuera de la imagen). Con height por JS es fiel en todo tamaño. */
     .car-arrows {
       position: absolute; top: 0; left: 0; right: 0;
-      aspect-ratio: 16/8;
+      height: 200px;                 /* respaldo; JS lo ajusta al alto real de la foto */
       z-index: 6; pointer-events: none;
       display: flex; align-items: center; justify-content: space-between;
       padding: 0 10px;
@@ -1460,8 +1463,10 @@
 
     /* ── Carrusel: ajustes móviles ── */
     @media(max-width:600px) {
-      /* Imagen con tope de altura: hero atractivo pero sin empujar el "porqué" fuera de vista */
-      .car-slide .hero .cover { aspect-ratio: 16/10; max-height: 190px; }
+      /* Imagen: ANCHO COMPLETO con altura fija (la img usa object-fit:cover y recorta). Antes
+         usaba aspect-ratio+max-height, que al topar reducía el ANCHO a ~304px y dejaba un hueco
+         a la derecha donde la flecha › quedaba flotando fuera de la foto. */
+      .car-slide .hero .cover { aspect-ratio: auto; height: 190px; max-height: none; }
 
       /* Título compacto: 2 líneas (el titular ya es fiel y corto) → deja ver el impacto */
       .car-slide .hero h2 {
@@ -2164,13 +2169,26 @@
       if (!car) return;
       const slides = [...car.querySelectorAll('.car-slide')];
       const dots = [...car.querySelectorAll('.car-dot')];
+      const arrows = car.querySelector('.car-arrows');
       let idx = 0, paused = false;
+      // La capa de flechas cubre EXACTAMENTE la foto: su alto = alto real del .cover activo.
+      function sizeArrows() {
+        const cover = car.querySelector('.car-slide.on .cover');
+        if (cover && arrows) arrows.style.height = cover.offsetHeight + 'px';
+      }
       function go(i) {
         idx = (i + slides.length) % slides.length;
         slides.forEach((s, j) => s.classList.toggle('on', j === idx));
         dots.forEach((d, j) => d.classList.toggle('on', j === idx));
+        sizeArrows();
         if (transOn) applyTranslation(true);            // el slide que entra también se traduce
       }
+      sizeArrows();
+      window.addEventListener('resize', sizeArrows);
+      // Las imágenes pueden cargar tarde y cambiar el alto → reajustar cuando terminen
+      car.querySelectorAll('.car-slide .cover img').forEach(img => {
+        if (!img.complete) img.addEventListener('load', sizeArrows, { once: true });
+      });
       // Pausas: al pasar el mouse / enfocar (que nadie pierda la lectura a media frase)
       car.addEventListener('mouseenter', () => paused = true);
       car.addEventListener('mouseleave', () => paused = false);
