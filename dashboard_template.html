@@ -1451,10 +1451,23 @@
     .car-slide .chips { min-height: 22px; }
     .car-slide .hero .impact {
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-      overflow: hidden; box-sizing: border-box;
+      overflow: hidden; box-sizing: border-box; position: relative;
       line-height: 20px;                 /* líneas a píxel exacto → el corte cae justo al final */
       min-height: 58px; max-height: 58px;   /* 2 líneas × 20px + 18px de padding */
+      cursor: pointer; transition: max-height .3s ease;
     }
+    /* Acordeón: al hacer clic, el impacto se despliega completo hacia abajo (y vuelve al reclic) */
+    .car-slide .hero .impact.exp {
+      -webkit-line-clamp: unset; display: block;
+      max-height: 320px; min-height: 0;
+    }
+    /* Indicador ▾ solo cuando el texto está recortado (hay más para leer) */
+    .car-slide .hero .impact.can-exp::after {
+      content: '▾ más'; position: absolute; right: 11px; bottom: 5px;
+      font-size: 10.5px; font-weight: 800; color: var(--navy2);
+      background: linear-gradient(90deg, transparent, #f5f7fb 55%); padding: 0 2px 0 16px;
+    }
+    .car-slide .hero .impact.exp.can-exp::after { content: '▴ menos'; background: #f5f7fb; }
     /* Preferencia de movimiento reducido: rota igual (es contenido), sin fundido ni zoom */
     @media (prefers-reduced-motion: reduce) {
       .car-slide { transition: none; }
@@ -1505,6 +1518,9 @@
     .notam-sum { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
     .notam-sum span { font-size: 11px; font-weight: 700; color: var(--navy2); background: #eef2f9; border: 1px solid var(--line); border-radius: 20px; padding: 3px 11px; }
     .notam-sum span.alta { color: #fff; background: var(--crit); border-color: var(--crit); }
+    /* Estado "sistema normal" del NAS: la sección nunca desaparece, comunica vigilancia activa */
+    .nas-normal { grid-column: 1 / -1; font-size: 13.5px; line-height: 1.6; color: var(--ink); background: #eef7f1; border: 1px solid #cfe6d8; border-left: 4px solid #1faf6a; border-radius: 0 8px 8px 0; padding: 14px 16px; }
+    .nas-normal .nas-ok { display: inline-block; font-weight: 800; color: #1faf6a; margin-right: 4px; }
     .notam-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; align-items: start; }
     .notam-card {
       background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--info);
@@ -1942,7 +1958,7 @@
     ...(EVENTS.some(isRD) ? [['rd', 'Rep. Dominicana']] : []),
     ['puj', 'Hub PUJ'],
     ...(NOTAMS.length ? [['notam', `NOTAM ${NOTAMS.length}`]] : []),
-    ...((NAS.events || []).length ? [['nas', `NAS EE.UU. ${NAS.events.length}`]] : []),
+    ...(NAS.updated ? [['nas', (NAS.events || []).length ? `NAS EE.UU. ${NAS.events.length}` : 'NAS EE.UU. ✓']] : []),
     ...cats.map(c => ['cat:' + c, catOf(c).label])];
     let view = 'portada';
     const nav = document.getElementById('nav');
@@ -2140,7 +2156,8 @@
         ${nPuj ? `<span class="alta">Red PUJ · ${nPuj}</span>` : ''}
         ${Object.entries(byLabel).sort((a, b) => b[1] - a[1]).map(([s, c]) => `<span>${esc(s)} · ${c}</span>`).join('')}
       </div>` : '';
-      const cards = evs.map(nasCard).join('') || `<p style="color:var(--muted)">Sin eventos activos en el NAS.</p>`;
+      const cards = evs.map(nasCard).join('') || `<div class="nas-normal">
+        <span class="nas-ok">✓</span> Sistema en operación normal — sin ground stops, programas de demora ni cierres activos en la red de EE.UU. en este momento. <span class="notam-disc">Vigilancia continua; esta sección se llena automáticamente cuando la FAA reporta un evento.</span></div>`;
       return `<div class="section">
         <div class="section-h"><span class="t">NAS · Estado del sistema de EE.UU. (FAA)</span><span class="rule"></span></div>
         <div class="notam-note">Ground stops, programas de demora y cierres <b>activos ahora</b> en aeropuertos de EE.UU. — un evento en la red marcada <b>Ruta PUJ</b> cascadea a los itinerarios de Punta Cana. Horas en hora local del este de EE.UU.
@@ -2173,20 +2190,40 @@
       const slides = [...car.querySelectorAll('.car-slide')];
       const dots = [...car.querySelectorAll('.car-dot')];
       const arrows = car.querySelector('.car-arrows');
-      let idx = 0, paused = false;
+      let idx = 0, paused = false, expanded = false;
       // La capa de flechas cubre EXACTAMENTE la foto: su alto = alto real del .cover activo.
       function sizeArrows() {
         const cover = car.querySelector('.car-slide.on .cover');
         if (cover && arrows) arrows.style.height = cover.offsetHeight + 'px';
       }
+      // Acordeón del impacto: marca ▾ si el texto está recortado (hay más para leer).
+      function markTruncation() {
+        const imp = car.querySelector('.car-slide.on .impact');
+        if (!imp) return;
+        if (imp.classList.contains('exp')) return;      // expandido: no medir
+        imp.classList.toggle('can-exp', imp.scrollHeight > imp.clientHeight + 1);
+      }
       function go(i) {
         idx = (i + slides.length) % slides.length;
         slides.forEach((s, j) => s.classList.toggle('on', j === idx));
         dots.forEach((d, j) => d.classList.toggle('on', j === idx));
-        sizeArrows();
+        // al cambiar de slide, colapsar cualquier impacto expandido
+        slides.forEach(s => s.querySelector('.impact')?.classList.remove('exp'));
+        expanded = false;
+        sizeArrows(); markTruncation();
         if (transOn) applyTranslation(true);            // el slide que entra también se traduce
       }
-      sizeArrows();
+      // Clic en el impacto → desplegar/colapsar (acordeón). Mientras esté abierto, se pausa el
+      // auto-avance para poder leerlo con calma.
+      car.querySelectorAll('.car-slide .impact').forEach(imp => {
+        imp.addEventListener('click', () => {
+          const nowExp = imp.classList.toggle('exp');
+          expanded = nowExp;
+          if (nowExp) imp.classList.add('can-exp');     // conserva el ▴ menos
+          else markTruncation();
+        });
+      });
+      sizeArrows(); markTruncation();
       window.addEventListener('resize', sizeArrows);
       // Las imágenes pueden cargar tarde y cambiar el alto → reajustar cuando terminen
       car.querySelectorAll('.car-slide .cover img').forEach(img => {
@@ -2203,7 +2240,7 @@
       // Auto-avance cada 8.5 s: tiempo cómodo para leer titular + impacto sin prisa. Pausa con
       // el mouse encima o pestaña oculta. Con "movimiento reducido" del sistema igual rota —
       // es contenido — pero sin fundido ni zoom (lo maneja el CSS).
-      carTimer = setInterval(() => { if (!paused && !document.hidden) go(idx + 1); }, 8500);
+      carTimer = setInterval(() => { if (!paused && !expanded && !document.hidden) go(idx + 1); }, 8500);
     }
 
     let firstRender = true;
