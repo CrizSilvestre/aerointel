@@ -22,6 +22,8 @@
     { "name": "NHC Atlántico (ciclones)", "type": "rss", "url": "https://www.nhc.noaa.gov/index-at.xml" },
     { "name": "NWS San Juan · alertas (Atom)", "type": "rss", "url": "https://api.weather.gov/alerts/active.atom?area=PR" },
     { "name": "Arecoa (RD)", "type": "rss", "url": "https://www.arecoa.com/feed/" },
+    { "name": "Arecoa · Aerolíneas (RD)", "type": "rss", "url": "https://www.arecoa.com/aerolineas/feed/" },
+    { "name": "El Dinero (RD)", "type": "rss", "url": "https://eldinero.com.do/feed/" },
     { "name": "Dominican Today (EN)", "type": "rss", "url": "https://dominicantoday.com/feed/" },
     { "name": "Flightradar24", "type": "rss", "url": "https://www.flightradar24.com/blog/feed/" },
     { "name": "Leeham News (industria)", "type": "rss", "url": "https://leehamnews.com/feed/" },
