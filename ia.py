@@ -62,6 +62,15 @@ _LLM_STATS = {"fallbacks": 0, "retries": 0}    # contadores de la corrida (salud
 _KEY_ALIASES = {"OPENROUTER_API_KEY": ("OPEN_ROUTER", "OPENROUTER_KEY")}
 
 
+def _http_reason(e):
+    """Mensaje corto del cuerpo de error del proveedor (para diagnosticar 401/402/etc.)."""
+    try:
+        body = json.loads(e.read())
+        return (body.get("error") or {}).get("message") or body.get("message") or e.reason
+    except Exception:
+        return getattr(e, "reason", "")
+
+
 def _get_key(key_env):
     """Devuelve la clave del env probando el nombre estándar y sus alias; '' si ninguna existe."""
     v = os.environ.get(key_env)
@@ -189,9 +198,12 @@ def analyze(text, n_sources):
             if e.code == 429:                 # cuota agotada → no reintentar este proveedor hoy
                 _DEAD_PROVIDERS.add(prov)
                 print(f"   ({prov}: cuota agotada (429) — se salta el resto de la corrida)")
+            else:                             # 401 clave inválida, 402 requiere créditos, etc.
+                _DEAD_PROVIDERS.add(prov)     # error de config → no insistir en cada evento
+                print(f"   ({prov}: HTTP {e.code} — {_http_reason(e)}; se salta el resto de la corrida)")
             continue                          # probar el siguiente proveedor del respaldo
         except Exception as e:
-            print(f"   ({prov} falló: {e} — probando siguiente proveedor)")
+            print(f"   ({prov} falló: {type(e).__name__}: {e} — probando siguiente proveedor)")
             continue
     _LLM_STATS["fallbacks"] += 1
     return analyze_heuristic(text, n_sources)
