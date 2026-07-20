@@ -9,7 +9,7 @@ on:
     # GitHub descarta ~2/3 de los disparos bajo carga (medido: 2/hora → mediana real 101 min;
     # 4/hora → ~30-50 min). Con 3 boletos/hora la cadencia real ronda la hora. Para frescura
     # inmediata está el botón "Actualizar" del dashboard (límite 30 min del lado del Worker).
-    - cron: "7,27,47 * * * *"
+    - cron: "17 * * * *"
   workflow_dispatch: {}          # permite correrlo a mano desde Actions
 
 permissions:
@@ -45,9 +45,11 @@ jobs:
           # Presupuesto de IA por corrida (free tier de Groq). Con cadencia ~1 h hay MENOS corridas,
           # así que cada una puede analizar MÁS: el top del periódico y el resumen de Mattermost
           # (que copia el top 7) van casi siempre con IA. Si la cuota se agota, cae a heurística.
-          AEROINTEL_LLM_MAX: "15"           # noticias top que reescribe el analista IA
-          AEROINTEL_NOTAM_LLM_MAX: "10"     # NOTAMs top que interpreta la IA
-          AEROINTEL_LLM_SLEEP: "2.0"        # ritmo entre llamadas (respeta rate limits)
+          # Presupuesto acotado a los free tiers (Groq + OpenRouter de respaldo). Menos llamadas
+          # por corrida = las cuotas diarias rinden y una corrida antes del demo sí tiene IA.
+          AEROINTEL_LLM_MAX: "10"           # top que reescribe el analista IA (carrusel primero)
+          AEROINTEL_NOTAM_LLM_MAX: "5"      # NOTAMs top que interpreta la IA
+          AEROINTEL_LLM_SLEEP: "4.0"        # ritmo entre llamadas (OpenRouter free: ~20/min)
           AEROINTEL_IMG_N: "48"
           # Botón "Actualizar" del dashboard: URL pública del Worker (el token vive en el
           # Worker como secret; el límite de 30 min lo aplica el propio Worker).
