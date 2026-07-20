@@ -169,10 +169,25 @@ STRONG_AVIATION_RE = re.compile(
     r"terminal a[eé]re|\bavi[oó]n|aircraft|despegu|aterriz|\bnotam\b|\bairbus|\bboeing|MDPC|\bPUJ\b", re.I)
 
 
+# Contenido MILITAR puro (cazas, bombarderos, fuerzas aéreas): ruido para un aeropuerto CIVIL
+# como PUJ. Se descarta salvo que haya un ancla CIVIL (aerolínea comercial, pasajeros, PUJ/SDQ…).
+MILITARY_RE = re.compile(
+    r"\bair force\b|fuerza a[eé]rea|\bfighter jet|fighter aircraft|\bwarplane|\bbomber\b|bombardero|"
+    r"\bF/?-?1[5-9]\b|\bF/?-?2[0-9]\b|\bF/?-?3[0-9]\b|\bF/A-\d|stealth (?:jet|fighter|bomber)|"
+    r"\bmissile\b|\bmisil|combat aircraft|escuadr[oó]n a[eé]reo|\bsquadron\b|\bwarfare\b", re.I)
+CIVIL_ANCHOR_RE = re.compile(
+    r"aerol[ií]nea|\bairline|passenger|pasajero|comercial|commercial|\bPUJ\b|punta cana|\bSDQ\b|"
+    r"arajet|jetblue|\bdelta\b|american airlines|\bcopa\b|avianca|latam|spirit|frontier|"
+    r"vuelo comercial|aeropuerto (?:internacional|civil)", re.I)
+
+
 def is_relevant(text):
     t = text or ""
     # Obra vial con mención incidental de aviación (financiación, enlaces relacionados) → fuera.
     if ROAD_INFRA_RE.search(t) and not STRONG_AVIATION_RE.search(t):
+        return False
+    # Contenido militar puro sin ancla civil → fuera (aeropuerto civil, no de defensa).
+    if MILITARY_RE.search(t) and not CIVIL_ANCHOR_RE.search(t):
         return False
     if AVIATION_RE.search(t):
         return True
