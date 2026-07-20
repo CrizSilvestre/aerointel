@@ -49,9 +49,9 @@ SYSTEM_PROMPT = (
 #   groq = Llama 3.3 70B (recomendado) · openrouter · cerebras.
 OPENAI_PROVIDERS = {
     "groq":       ("https://api.groq.com/openai/v1/chat/completions", "llama-3.3-70b-versatile", "GROQ_API_KEY"),
-    # OpenRouter retiró el Llama 3.3 70B gratis (jul 2026, ahora de pago). gpt-oss-20b:free sigue
-    # gratis y sigue bien el formato JSON del prompt. Alternativa capaz: nvidia/nemotron-3-super-120b-a12b:free.
-    "openrouter": ("https://openrouter.ai/api/v1/chat/completions", "openai/gpt-oss-20b:free", "OPENROUTER_API_KEY"),
+    # OpenRouter retiró el Llama 3.3 70B gratis (jul 2026). gpt-oss/nemotron son de RAZONAMIENTO
+    # (dejan 'content' vacío y JSON sucio). Gemma 4 (instruction-tuned) devuelve JSON limpio y gratis.
+    "openrouter": ("https://openrouter.ai/api/v1/chat/completions", "google/gemma-4-31b-it:free", "OPENROUTER_API_KEY"),
     "cerebras":   ("https://api.cerebras.ai/v1/chat/completions", "llama3.1-8b", "CEREBRAS_API_KEY"),
 }
 
@@ -130,8 +130,21 @@ def _llm_post(url, payload, headers, timeout=60, tries=None):
     raise last
 
 
+def _msg_text(raw):
+    """Texto del mensaje del proveedor, tolerante a variantes: algunos modelos dejan 'content'
+    vacío y ponen la salida en 'reasoning'/'reasoning_content'."""
+    msg = raw["choices"][0]["message"]
+    return (msg.get("content") or msg.get("reasoning_content") or msg.get("reasoning") or "").strip()
+
+
 def _parse_llm_json(txt):
-    r = json.loads(re.search(r"\{.*\}", txt, re.S).group(0))
+    txt = (txt or "").strip()
+    if txt.startswith("```"):                        # quita cercas markdown ```json … ```
+        txt = re.sub(r"^```[a-z]*\s*|\s*```$", "", txt, flags=re.I | re.S).strip()
+    m = re.search(r"\{.*\}", txt, re.S)
+    if not m:
+        raise ValueError("respuesta LLM sin objeto JSON")
+    r = json.loads(m.group(0))
     r.setdefault("impact_score", 50); r.setdefault("affects_puj", False); r.setdefault("aerolineas", [])
     r.setdefault("categoria", "industria"); r.setdefault("severidad", "info"); r.setdefault("confianza", 0.7)
     r.setdefault("titular", ""); r.setdefault("resumen", "")
@@ -159,7 +172,7 @@ def analyze_openai_compatible(text, prov):
                "messages": [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": text[:4000]}]}
     raw = _llm_post(base, payload,
         {"Authorization": f"Bearer {key}", "Content-Type": "application/json", "User-Agent": UA})
-    return _parse_llm_json(raw["choices"][0]["message"]["content"])
+    return _parse_llm_json(_msg_text(raw))
 
 
 # Proveedores con cuota agotada EN ESTA CORRIDA → no volver a intentarlos (evita quemar tiempo).
@@ -284,7 +297,7 @@ def llm_complete(system, user, prov, max_tokens=220):
             raw = _llm_post(base, payload,
                 {"Authorization": f"Bearer {key}", "Content-Type": "application/json", "User-Agent": UA},
                 timeout=40)
-            return raw["choices"][0]["message"]["content"].strip()
+            return _msg_text(raw)
     except urllib.error.HTTPError as e:
         if e.code == 429:
             _DEAD_PROVIDERS.add(prov)    # cuota agotada → saltar este proveedor el resto de la corrida
