@@ -317,6 +317,33 @@ try:
 finally:
     IA.analyze = _real_analyze
 
+# ── Cadena de proveedores LLM: respaldo automático si el primario agota cuota ──
+_env_bak = {k: os.environ.get(k) for k in ("AEROINTEL_LLM", "GROQ_API_KEY", "OPENROUTER_API_KEY", "ANTHROPIC_API_KEY")}
+for k in _env_bak:
+    os.environ.pop(k, None)
+os.environ["AEROINTEL_LLM"] = "groq"; os.environ["GROQ_API_KEY"] = "x"
+ok("cadena · una sola clave = solo ese proveedor", IA._provider_chain() == ["groq"])
+os.environ["OPENROUTER_API_KEY"] = "y"
+ok("cadena · groq + openrouter en orden", IA._provider_chain() == ["groq", "openrouter"])
+# Fallback: si groq 429, se usa openrouter para ese evento
+import urllib.error as _ue, io as _io2
+IA._DEAD_PROVIDERS.clear()
+_real_aw = IA._analyze_with
+def _fake_aw(prov, text):
+    if prov == "groq":
+        raise _ue.HTTPError("u", 429, "Too Many", {}, _io2.BytesIO(b""))
+    r = AN.analyze_heuristic(text, 1); r["_llm"] = True; r["_prov"] = prov; return r
+IA._analyze_with = _fake_aw
+try:
+    r = IA.analyze("Arajet vuelo Punta Cana", 1)
+    ok("cadena · groq 429 → cae a openrouter", r.get("_prov") == "openrouter" and r.get("_llm") is True)
+    ok("cadena · groq marcado muerto tras 429", "groq" in IA._DEAD_PROVIDERS)
+finally:
+    IA._analyze_with = _real_aw; IA._DEAD_PROVIDERS.clear()
+for k, v in _env_bak.items():
+    if v is None: os.environ.pop(k, None)
+    else: os.environ[k] = v
+
 # ── METAR server-side → /api/weather.json (fetch simulado, sin red) ──
 _real_fetch = CL.fetch
 CL.fetch = lambda url, timeout=15: b'[{"temp": 28.0, "wdir": 90, "wspd": 12, "rawOb": "MDPC 021800Z 09012KT"}]'

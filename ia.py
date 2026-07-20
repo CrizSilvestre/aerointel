@@ -136,25 +136,49 @@ def analyze_openai_compatible(text, prov):
     return _parse_llm_json(raw["choices"][0]["message"]["content"])
 
 
+# Proveedores con cuota agotada EN ESTA CORRIDA → no volver a intentarlos (evita quemar tiempo).
+_DEAD_PROVIDERS = set()
+
+
+def _provider_chain():
+    """Orden de proveedores a intentar: el primario (AEROINTEL_LLM) y como RESPALDO los demás
+    que tengan clave configurada. Así, si el primario agota su cuota diaria (429), la IA sigue
+    con otro gratis (mismo modelo Llama 3.3 70B en groq/openrouter) — el carrusel y las noticias
+    top nunca quedan en heurística por un tope de cuota. Con una sola clave, se comporta igual."""
+    primary = os.environ.get("AEROINTEL_LLM", "").lower()
+    chain = []
+    if primary in OPENAI_PROVIDERS or primary == "anthropic":
+        chain.append(primary)
+    if os.environ.get("ANTHROPIC_API_KEY") and "anthropic" not in chain:
+        chain.append("anthropic")
+    for prov, (_, _, key_env) in OPENAI_PROVIDERS.items():
+        if prov not in chain and os.environ.get(key_env):
+            chain.append(prov)
+    return chain
+
+
+def _analyze_with(prov, text):
+    r = analyze_anthropic(text) if prov == "anthropic" else analyze_openai_compatible(text, prov)
+    r["_llm"] = True          # marca: análisis real de IA (no heurística de respaldo)
+    r["_prov"] = prov
+    return r
+
+
 def analyze(text, n_sources):
-    prov = os.environ.get("AEROINTEL_LLM", "").lower()
-    if not prov and os.environ.get("ANTHROPIC_API_KEY"):
-        prov = "anthropic"
-    if prov:
+    for prov in _provider_chain():
+        if prov in _DEAD_PROVIDERS:
+            continue
         try:
-            r = None
-            if prov == "anthropic":
-                r = analyze_anthropic(text)
-            elif prov in OPENAI_PROVIDERS:
-                r = analyze_openai_compatible(text, prov)
-            else:
-                print(f"   (proveedor LLM '{prov}' no reconocido — uso heurística)")
-            if r is not None:
-                r["_llm"] = True          # marca: análisis real de IA (no heurística de respaldo)
-                return r
+            return _analyze_with(prov, text)
+        except urllib.error.HTTPError as e:
+            if e.code == 429:                 # cuota agotada → no reintentar este proveedor hoy
+                _DEAD_PROVIDERS.add(prov)
+                print(f"   ({prov}: cuota agotada (429) — se salta el resto de la corrida)")
+            continue                          # probar el siguiente proveedor del respaldo
         except Exception as e:
-            _LLM_STATS["fallbacks"] += 1
-            print(f"   (LLM falló tras {LLM_RETRIES} intentos, uso heurística: {e})")
+            print(f"   ({prov} falló: {e} — probando siguiente proveedor)")
+            continue
+    _LLM_STATS["fallbacks"] += 1
     return analyze_heuristic(text, n_sources)
 
 # Cortacircuito: si N eventos SEGUIDOS agotan sus reintentos (cuota/rate limit persistente),
@@ -232,16 +256,29 @@ def llm_complete(system, user, prov, max_tokens=220):
                 {"Authorization": f"Bearer {key}", "Content-Type": "application/json", "User-Agent": UA},
                 timeout=40)
             return raw["choices"][0]["message"]["content"].strip()
+    except urllib.error.HTTPError as e:
+        if e.code == 429:
+            _DEAD_PROVIDERS.add(prov)    # cuota agotada → saltar este proveedor el resto de la corrida
+        return None
     except Exception:
         return None
 
 
-def interpret_notams_llm(notam_list, prov, cap=14, pause=0.8):
+def interpret_notams_llm(notam_list, prov=None, cap=14, pause=0.8):
+    chain = _provider_chain()
+    if not chain:
+        return 0
     done = 0
     for n in notam_list[:cap]:
-        txt = llm_complete(NOTAM_SYS, n.get("raw") or n.get("body") or "", prov, max_tokens=110)
+        txt = None
+        for p in chain:                 # respaldo entre proveedores, como en las noticias
+            if p in _DEAD_PROVIDERS:
+                continue
+            txt = llm_complete(NOTAM_SYS, n.get("raw") or n.get("body") or "", p, max_tokens=110)
+            if txt:
+                break
         if not txt:
-            break                       # rate-limit/fallo → conservar la lectura heurística para el resto
+            break                       # todos los proveedores fallaron → conservar la heurística
         # tope duro por si el modelo se extiende: ~1-2 frases, evita tarjetas disparejas
         if len(txt) > 260:
             cut = txt[:260].rsplit(" ", 1)[0]
