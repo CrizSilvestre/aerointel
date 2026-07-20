@@ -49,7 +49,9 @@ SYSTEM_PROMPT = (
 #   groq = Llama 3.3 70B (recomendado) · openrouter · cerebras.
 OPENAI_PROVIDERS = {
     "groq":       ("https://api.groq.com/openai/v1/chat/completions", "llama-3.3-70b-versatile", "GROQ_API_KEY"),
-    "openrouter": ("https://openrouter.ai/api/v1/chat/completions", "meta-llama/llama-3.3-70b-instruct:free", "OPENROUTER_API_KEY"),
+    # OpenRouter retiró el Llama 3.3 70B gratis (jul 2026, ahora de pago). gpt-oss-20b:free sigue
+    # gratis y sigue bien el formato JSON del prompt. Alternativa capaz: nvidia/nemotron-3-super-120b-a12b:free.
+    "openrouter": ("https://openrouter.ai/api/v1/chat/completions", "openai/gpt-oss-20b:free", "OPENROUTER_API_KEY"),
     "cerebras":   ("https://api.cerebras.ai/v1/chat/completions", "llama3.1-8b", "CEREBRAS_API_KEY"),
 }
 
