@@ -58,6 +58,21 @@ OPENAI_PROVIDERS = {
 LLM_RETRIES = int(os.environ.get("AEROINTEL_LLM_RETRIES", "3"))
 _LLM_STATS = {"fallbacks": 0, "retries": 0}    # contadores de la corrida (salud → consola/Mattermost)
 
+# Nombres alternativos aceptados para cada clave (comodidad: p. ej. el secret OPEN_ROUTER).
+_KEY_ALIASES = {"OPENROUTER_API_KEY": ("OPEN_ROUTER", "OPENROUTER_KEY")}
+
+
+def _get_key(key_env):
+    """Devuelve la clave del env probando el nombre estándar y sus alias; '' si ninguna existe."""
+    v = os.environ.get(key_env)
+    if v:
+        return v
+    for alt in _KEY_ALIASES.get(key_env, ()):
+        v = os.environ.get(alt)
+        if v:
+            return v
+    return os.environ.get("LLM_API_KEY", "")
+
 
 def _ra_seconds(retry_after):
     """Parsea Retry-After (segundos) a float; None si no viene o no es numérico."""
@@ -127,7 +142,7 @@ def analyze_anthropic(text):
 
 def analyze_openai_compatible(text, prov):
     base, default_model, key_env = OPENAI_PROVIDERS[prov]
-    key = os.environ.get(key_env) or os.environ.get("LLM_API_KEY", "")
+    key = _get_key(key_env)
     model = os.environ.get("AEROINTEL_MODEL", default_model)
     payload = {"model": model, "max_tokens": 500, "temperature": 0.2,
                "messages": [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": text[:4000]}]}
@@ -152,7 +167,7 @@ def _provider_chain():
     if os.environ.get("ANTHROPIC_API_KEY") and "anthropic" not in chain:
         chain.append("anthropic")
     for prov, (_, _, key_env) in OPENAI_PROVIDERS.items():
-        if prov not in chain and os.environ.get(key_env):
+        if prov not in chain and _get_key(key_env):
             chain.append(prov)
     return chain
 
@@ -248,7 +263,7 @@ def llm_complete(system, user, prov, max_tokens=220):
             return raw["content"][0]["text"].strip()
         if prov in OPENAI_PROVIDERS:
             base, default_model, key_env = OPENAI_PROVIDERS[prov]
-            key = os.environ.get(key_env) or os.environ.get("LLM_API_KEY", "")
+            key = _get_key(key_env)
             model = os.environ.get("AEROINTEL_MODEL", default_model)
             payload = {"model": model, "max_tokens": max_tokens, "temperature": 0.2,
                        "messages": [{"role": "system", "content": system}, {"role": "user", "content": user[:1500]}]}

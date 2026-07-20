@@ -38,7 +38,8 @@ jobs:
           AEROINTEL_LLM: groq                          # proveedor primario
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           # Respaldo automático: si Groq agota su cuota diaria (429), la IA sigue con OpenRouter.
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          # El secret se llama OPEN_ROUTER; aquí se expone con el nombre que el pipeline espera.
+          OPENROUTER_API_KEY: ${{ secrets.OPEN_ROUTER }}
           MATTERMOST_WEBHOOK_URL: ${{ secrets.MATTERMOST_WEBHOOK_URL }}
           RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}   # SkyLink NOTAM API (opcional; sin él, sin sección NOTAM)
           # Presupuesto de IA por corrida (free tier de Groq). Con cadencia ~1 h hay MENOS corridas,
