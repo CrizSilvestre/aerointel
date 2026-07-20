@@ -36,6 +36,13 @@ ok("relevante · 'faa' en 'rafaela' NO es aviación", not REL.is_relevant("La em
 ok("relevante · 'Pujols' NO es PUJ", not REL.is_relevant(
     "La AIRD propone cambios al Código Penal, afirmó Mario Pujols, vicepresidente de la entidad"))
 ok("relevante · 'vuelo a PUJ' en mayúsculas SÍ", REL.is_relevant("Aerolínea anuncia vuelo a PUJ desde Bogotá"))
+# Regresión (bug demo): obra vial con "Aerodom" incidental NO es aviación
+ok("relevante · paso a desnivel + Aerodom NO entra", not REL.is_relevant(
+    "Gobierno inaugura paso a desnivel Plaza de la Bandera, obra financiada. Aerodom"))
+ok("relevante · autopista sola NO entra", not REL.is_relevant("Reparan la autopista Duarte tras las lluvias"))
+ok("relevante · obra vial CON vuelos SÍ entra", REL.is_relevant("Nueva carretera al aeropuerto agiliza vuelos"))
+# 'vuelos' plural debe contar como señal de aviación (antes solo 'vuelo' singular)
+ok("relevante · 'vuelos' plural SÍ", REL.is_relevant("Cancelan vuelos en el país por mal tiempo"))
 # Aniversarios/reseñas históricas = recap (no breaking)
 ok("recap · aniversario detectado", bool(REL.RECAP_RE.search("25 years since the Concorde crash that changed aviation")))
 ok("recap · 'anniversary' detectado", bool(REL.RECAP_RE.search("Airline marks anniversary of first flight")))

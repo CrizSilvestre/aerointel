@@ -147,7 +147,7 @@ def is_dr(text):
 # Evita ruido de feeds generales (economía/agro de Diario Libre). Se usa LÍMITE DE PALABRA: tokens
 # cortos como "jet"/"faa"/"iata" NO deben matchear como subcadena (p. ej. "jet" dentro de "objetivo").
 AVIATION_RE = re.compile(
-    r"\baviation|\bairline|\bairport|\bflight|\baircraft|\baerol|\baeropuerto|\bvuelo\b|\bavi[oó]n|"
+    r"\baviation|\bairline|\bairport|\bflight|\baircraft|\baerol|\baeropuerto|\bvuelos?\b|\bavi[oó]n|"
     r"\baviaci|\bairbus|\bboeing|\bjet\b|\bjetliner|\bcarrier\b|\baerodom|\bidac\b|\bnotam|\brunway|"
     r"\bpista\b|\bdespegu|\baterriz|\bslot\b|\bhandling|\brampa\b|terminal a[eé]re|aviaci[oó]n civil|"
     r"civil aviation|\bicao\b|\biata\b|\bfaa\b|\beasa\b|\btripulaci|\bcockpit|\bfuselaje|\bairspace|"
@@ -158,8 +158,22 @@ AVIATION_RE = re.compile(
 DR_AIRPORT_CODES_RE = re.compile(r"\b(PUJ|SDQ|STI|POP|AZS|LRM|MDPC|MDSD|MDST|MDPP)\b")
 
 
+# Infraestructura VIAL: a veces cae junto al nombre del operador aeroportuario ("Aerodom financia
+# la obra") pero NO es aviación (un paso a desnivel no es una ruta de vuelos). Se descarta salvo
+# que haya una señal AÉREA FUERTE (aeropuerto/vuelo/pista/terminal aérea…), no solo el operador.
+ROAD_INFRA_RE = re.compile(
+    r"paso a desnivel|elevado vial|t[uú]nel vial|\bautopista|\bcarretera|\bpeaje|"
+    r"circunvalaci[oó]n|puente (?!a[eé]reo)", re.I)
+STRONG_AVIATION_RE = re.compile(
+    r"aeropuerto|airport|\bvuelo\b|\bvuelos\b|\bflight|aerol[ií]nea|airline|\bpista\b|\brunway\b|"
+    r"terminal a[eé]re|\bavi[oó]n|aircraft|despegu|aterriz|\bnotam\b|\bairbus|\bboeing|MDPC|\bPUJ\b", re.I)
+
+
 def is_relevant(text):
     t = text or ""
+    # Obra vial con mención incidental de aviación (financiación, enlaces relacionados) → fuera.
+    if ROAD_INFRA_RE.search(t) and not STRONG_AVIATION_RE.search(t):
+        return False
     if AVIATION_RE.search(t):
         return True
     if detect_airlines(t):
