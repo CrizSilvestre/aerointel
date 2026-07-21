@@ -72,35 +72,53 @@ def fetch_og_image(url, timeout=10):
     return None
 
 
+def _feed_image_for(ev):
+    """Imagen que YA declara el feed para este evento (cluster): prefiere un ítem de FUENTE
+    DIRECTA (no Google News, cuyo RSS no trae la foto real). Devuelve '' si ningún ítem la trae."""
+    items = sorted(ev["items"], key=lambda it: "news.google.com" in (it.get("link") or ""))
+    for it in items:
+        img = it.get("image") or ""
+        if img and img.startswith("http") and not GENERIC_IMG_RE.search(img):
+            return img
+    return ""
+
+
 def fetch_images_parallel(events, n=20, max_workers=8):
-    """Enriquece los top-N eventos con 'image_url' en paralelo.
-    Los que no tienen imagen quedan con image_url=None (el dashboard usa fallback de color)."""
-    top = events[:n]
-    if not top:
+    """Enriquece los eventos con 'image_url'. La imagen del feed RSS es GRATIS (viene en el XML),
+    así que se asigna a TODOS los eventos; el og:image (que abre el artículo) solo se intenta en
+    los top-N que aún no tienen foto (típicamente los de Google News, cuyo RSS no la trae)."""
+    if not events:
         return
-    print(f"  Extrayendo imágenes para {len(top)} eventos ({max_workers} workers paralelos)…", end="", flush=True)
-    urls = [ev["items"][0]["link"] for ev in top]
-    results = {i: None for i in range(len(top))}
+    # 1) imagen del feed para TODOS los eventos (sin red): la mayoría de fuentes directas la incluyen
+    from_feed = 0
+    for ev in events:
+        img = _feed_image_for(ev)
+        ev["image_url"] = img or None
+        if img:
+            from_feed += 1
+    # 2) og:image solo para los top-N que siguen sin imagen (abre el artículo → costoso)
+    need_fetch = [ev for ev in events[:n] if not ev.get("image_url")]
+    print(f"  Imágenes: {from_feed} del feed · extrayendo {len(need_fetch)} restantes ({max_workers} workers)…",
+          end="", flush=True)
+    results = {}
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futs = {pool.submit(fetch_og_image, url): i for i, url in enumerate(urls)}
+        futs = {pool.submit(fetch_og_image, ev["items"][0]["link"]): ev for ev in need_fetch}
         for fut in as_completed(futs):
-            idx = futs[fut]
             try:
-                results[idx] = fut.result()
+                results[id(futs[fut])] = fut.result()
             except Exception:
                 pass
-    # Filtro de calidad de imagen: una foto de artículo REAL es única. Un placeholder/logo
-    # (p. ej. la tarjeta genérica de Google News) se repite entre muchos artículos → se rechaza.
-    counts = Counter(u for u in results.values() if u)
-    kept = 0
-    for i, ev in enumerate(top):
-        u = results.get(i)
+    # Filtro de calidad SOLO sobre las extraídas por og:image: una foto real es única; el
+    # placeholder/tarjeta genérica de Google News se repite entre muchos artículos → se rechaza.
+    fetched = [results.get(id(ev)) for ev in need_fetch]
+    counts = Counter(u for u in fetched if u)
+    for ev in need_fetch:
+        u = results.get(id(ev))
         if u and (counts[u] > 1 or GENERIC_IMG_RE.search(u)):
-            u = None                                  # placeholder/logo compartido → ficha de categoría
-        if u:
-            kept += 1
+            u = None
         ev["image_url"] = u
-    print(f" {kept}/{len(top)} con imagen real y única (resto → ficha de inteligencia).")
+    kept = sum(1 for ev in events if ev.get("image_url"))
+    print(f" {kept}/{len(events)} con imagen real y única (resto → ficha de inteligencia).")
 
 # Boost visual: una nota con foto real sube un poco en el ranking (portada más atractiva) sin
 # alterar el fondo del modelo. Se aplica DESPUÉS del umbral de publicación: solo reordena.

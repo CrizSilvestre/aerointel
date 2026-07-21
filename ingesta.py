@@ -91,6 +91,30 @@ def human_age(dt):
     return dt.strftime("%d %b %H:%M")
 
 
+# Imágenes-basura dentro de los feeds: emojis de WordPress, píxeles de tracking, avatares.
+_FEED_IMG_JUNK = re.compile(r"s\.w\.org|/emoji/|gravatar|/avatar|spacer|1x1|pixel\.|/feed-", re.I)
+# <img> dentro de la descripción HTML (fallback cuando no hay media:content/enclosure).
+_DESC_IMG_RE = re.compile(r'<img[^>]+src=["\']([^"\']+)["\']', re.I)
+
+
+def _feed_image(el, raw_desc):
+    """Imagen que el propio feed RSS declara (la del artículo, única y fiable, sin abrir la página):
+    media:content / media:thumbnail (atributo url), <enclosure type=image>, o el primer <img> real
+    de la descripción. Devuelve '' si no hay ninguna aceptable."""
+    for ch in el:
+        lt = localname(ch.tag)
+        u = ch.get("url") or ""
+        if lt in ("content", "thumbnail") and u:                 # media:content / media:thumbnail
+            if u.startswith("http") and not _FEED_IMG_JUNK.search(u):
+                return u
+        if lt == "enclosure" and "image" in (ch.get("type") or "") and u.startswith("http"):
+            return u
+    m = _DESC_IMG_RE.search(raw_desc or "")                       # <img> en la descripción HTML
+    if m and m.group(1).startswith("http") and not _FEED_IMG_JUNK.search(m.group(1)):
+        return html.unescape(m.group(1))
+    return ""
+
+
 def parse_feed(xml_bytes, source_name):
     out = []
     try:
@@ -101,6 +125,7 @@ def parse_feed(xml_bytes, source_name):
         if localname(el.tag) not in ("item", "entry"):
             continue
         d = {"title": "", "link": "", "desc": "", "pub": ""}
+        raw_desc = ""
         for ch in el:
             lt = localname(ch.tag)
             if lt == "title":
@@ -108,12 +133,14 @@ def parse_feed(xml_bytes, source_name):
             elif lt == "link" and not d["link"]:
                 d["link"] = (ch.get("href") or ch.text or "").strip()
             elif lt in ("description", "summary", "content") and not d["desc"]:
+                raw_desc = ch.text or ""                          # HTML crudo (para sacar <img>)
                 d["desc"] = clean(ch.text)
             elif lt in ("pubdate", "published", "updated", "date") and not d["pub"]:
                 d["pub"] = (ch.text or "").strip()
         if d["title"] and d["link"]:
             d["source"] = source_name
             d["dt"] = parse_date(d["pub"])
+            d["image"] = _feed_image(el, raw_desc)                # imagen declarada por el feed ('' si no)
             out.append(d)
     return out[:MAX_PER_SOURCE]
 
