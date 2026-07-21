@@ -18,6 +18,10 @@ _OG_RE = re.compile(
     r'|<meta[^>]+content=["\']([^"\' <>]+)["\'][^>]+(?:property=["\']og:image["\']|name=["\']twitter:image["\'])',
     re.I | re.S
 )
+# Fallback JSON-LD: muchos sitios (WordPress + SEO) NO ponen og:image pero sí declaran la
+# imagen del artículo en el bloque schema.org como "contentUrl" o "image":"…"/{"url":"…"}.
+_JSONLD_IMG_RE = re.compile(
+    r'"(?:contentUrl|url|image)"\s*:\s*"(https?://[^"]+?\.(?:jpe?g|png|webp)(?:\?[^"]*)?)"', re.I)
 # Imágenes a rechazar siempre: logos/branding de plataformas y thumbnails diminutos (no son
 # la foto del artículo). El logo-tarjeta de Google News cae aquí o por el filtro de frecuencia.
 GENERIC_IMG_RE = re.compile(
@@ -47,8 +51,9 @@ def fetch_og_image(url, timeout=10):
         return None
     try:
         is_gnews = "news.google.com/" in url
-        # Google News embebe la imagen de artículo casi al final del HTML (~600 KB)
-        body = _fetch_html(url, timeout=timeout, max_bytes=720000 if is_gnews else 65536)
+        # Google News embebe la imagen casi al final del HTML (~600 KB). Para URLs directas,
+        # 140 KB cubre el <head> completo + el bloque JSON-LD (que a veces está más abajo).
+        body = _fetch_html(url, timeout=timeout, max_bytes=720000 if is_gnews else 140000)
         if is_gnews:
             # Extraer thumbnail de previsualización de Google News
             imgs = _GNEWS_IMG_RE.findall(body)
@@ -61,11 +66,16 @@ def fetch_og_image(url, timeout=10):
             large = [i for i in imgs if '=w16' not in i and '=w24' not in i and '=w32' not in i and '=w48' not in i]
             if large:
                 return large[0]
-        # Para URLs directas (o fallback de GNews): buscar og:image
+        # Para URLs directas (o fallback de GNews): buscar og:image / twitter:image
         m = _OG_RE.search(body)
         if m:
             img = html.unescape((m.group(1) or m.group(2) or "").strip())
             if img.startswith("http"):
+                return img
+        # Fallback: imagen del bloque JSON-LD (sitios sin og:image, p. ej. Arecoa)
+        for m in _JSONLD_IMG_RE.finditer(body):
+            img = html.unescape(m.group(1).strip())
+            if img.startswith("http") and not GENERIC_IMG_RE.search(img):
                 return img
     except Exception:
         pass
