@@ -12,21 +12,25 @@ from analisis import entity_chips
 
 COLOR = {"crítico": "#c00000", "importante": "#e69100", "info": "#1F3864"}
 EMOJI = {"crítico": "🔴", "importante": "🟠", "info": "🔵"}
-LEVEL = {"crítico": "BREAKING", "importante": "UPDATE", "info": "INFO"}
+LEVEL = {"crítico": "ÚLTIMA HORA", "importante": "ACTUALIZACIÓN", "info": "INFO"}
+CAT_ES = {"meteo": "Clima", "seguridad": "Seguridad", "operaciones": "Operaciones",
+          "rutas": "Rutas", "industria": "Industria", "regulatorio": "Regulatorio",
+          "tecnologia": "Tecnología"}
 
 
 def to_mattermost(ev):
     a, first = ev["analysis"], ev["items"][0]
     sev = a["severidad"]
     sources = ", ".join(sorted({it["source"] for it in ev["items"]}))
+    cat = CAT_ES.get(a["categoria"], a["categoria"].capitalize())
     text = (f"**{a.get('titular') or first['title']}**\n\n*Por qué importa:* {a['angulo_editorial']}\n\n"
-            f"**Impacto:** {a['impact_score']}/100 · **Confianza:** {a.get('confianza', '-')} · "
-            f"**Categoría:** {a['categoria']}")
+            f"**Impacto operacional:** {a['impact_score']}/100 · **Confianza:** {a.get('confianza', '-')} · "
+            f"**Categoría:** {cat}")
     return {"username": "AeroIntel",
             "attachments": [{"color": COLOR.get(sev, "#1F3864"),
-                             "title": f"{LEVEL.get(sev, 'INFO')} · {a['categoria'].upper()}",
+                             "title": f"{LEVEL.get(sev, 'INFO')} · {cat.upper()}",
                              "text": text,
-                             "footer": f"Fuentes: {sources} · {len(ev['items'])} fuente(s) · {datetime.now():%d %b %Y %H:%M}",
+                             "footer": f"Fuentes: {sources} · {len(ev['items'])} fuente(s) · {datetime.now():%d %b %Y %H:%M} (hora RD)",
                              "actions": [{"type": "button", "name": "Ver fuente", "url": first["link"]}]}]}
 
 # ── Monitor de salud: aviso a Mattermost el DÍA que algo falle (fuente caída, NOTAM, LLM
