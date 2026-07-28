@@ -59,6 +59,25 @@ jobs:
           python3 aerointel.py
           cp output/dashboard.html output/index.html   # Pages sirve index.html en la raíz
 
+      # ── Airside ────────────────────────────────────────────────────────────
+      # El mismo ciclo que publica el periódico empuja a Airside: noticias con
+      # sus pertenencias (Hub PUJ / Rep. Dominicana), NOTAM, NAS y el METAR con
+      # su pronóstico. Así Airside es autónomo estando en Netlify —no tiene que
+      # salir a ninguna API— y su frescura es la de este cron.
+      #
+      # `continue-on-error` es deliberado: que Airside esté caído, mal
+      # configurado o a medio desplegar NO puede impedir que AeroIntel publique
+      # lo suyo. Es la misma regla que ya rige dentro del script.
+      #
+      # Sin el secret AIRSIDE_URL el paso se salta solo y termina en 0.
+      - name: Empujar a Airside
+        continue-on-error: true
+        env:
+          AIRSIDE_URL: ${{ secrets.AIRSIDE_URL }}
+          AIRSIDE_INTEL_CLAVE: ${{ secrets.AIRSIDE_INTEL_CLAVE }}
+          RAPIDAPI_KEY: ${{ secrets.RAPIDAPI_KEY }}   # NOTAM: respaldo si la FAA no responde
+        run: python3 empujar_a_airside.py
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

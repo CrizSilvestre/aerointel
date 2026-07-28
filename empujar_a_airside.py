@@ -292,10 +292,18 @@ def main() -> int:
                    help="mandar también lo que no afecta a PUJ")
     a = p.parse_args()
 
+    # Sin AIRSIDE_URL configurada no hay a quién empujar: se sale en silencio y
+    # con 0. Esto corre dentro del ciclo de AeroIntel, y AeroIntel no puede
+    # fallar su publicación porque nadie haya conectado Airside todavía.
+    if not os.environ.get("AIRSIDE_URL"):
+        print("AIRSIDE_URL no configurada — no hay nada que empujar. Se omite.")
+        return 0
+
     clave = os.environ.get("AIRSIDE_INTEL_CLAVE")
     if not clave:
-        print("Falta AIRSIDE_INTEL_CLAVE. Sin clave, Airside rechaza la ingesta "
-              "—y hace bien.", file=sys.stderr)
+        # Con destino pero sin clave sí es un error: alguien configuró la mitad.
+        print("AIRSIDE_URL está puesta pero falta AIRSIDE_INTEL_CLAVE. Sin clave, "
+              "Airside rechaza la ingesta —y hace bien.", file=sys.stderr)
         return 2
 
     # Cada tipo por separado y con fallo suave: que la FAA no responda no puede
