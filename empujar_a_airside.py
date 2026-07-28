@@ -186,24 +186,47 @@ def leer_nas() -> list[dict]:
 
 
 def leer_clima() -> list[dict]:
-    """El METAR de MDPC vía clima.py. Un solo item: la observación vigente."""
+    """El METAR de MDPC vía clima.py, ENTERO.
+
+    La fuente devuelve el METAR ya descodificado —viento, visibilidad, techo,
+    temperatura, QNH, categoría de vuelo— y durante un tiempo esto mandaba
+    sólo el texto crudo y lo tiraba todo. Airside tenía que enseñar un
+    aeropuerto entero con una línea de texto."""
     from clima import fetch_weather
     d = fetch_weather()
     if not d:
         print("  Clima: sin METAR", file=sys.stderr)
         return []
     m = d.get("metar") or {}
-    crudo = m.get("rawOb") or m.get("raw_text") or ""
+    est = d.get("station") or "MDPC"
+    # `visib` llega como "6+" (millas) o como número. Se manda tal cual y que
+    # Airside lo presente: traducir unidades aquí sería opinar por él.
     return [{
-        "id":        f'METAR {d.get("station")}',
-        "titulo":    f'METAR {d.get("station")} · observación vigente',
-        "enlace":    f'https://aviationweather.gov/data/metar/?id={d.get("station")}',
-        "fuente":    "aviationweather.gov",
+        "id":        f"METAR {est}",
+        "codigo":    est,
+        "titulo":    f"METAR {est}",
+        "enlace":    f"https://aviationweather.gov/data/metar/?id={est}",
+        "fuente":    "aviationweather.gov · NOAA",
         "categoria": "meteo",
         "gravedad":  "info",
-        "porque":    crudo,               # el METAR crudo: quien lo lee, lo entiende
         "publicado": m.get("reportTime") or d.get("fetched_at"),
-        "entidades": [d.get("station") or ""],
+        "crudo":     m.get("rawOb") or "",
+        "entidades": [est],
+        # El METAR descodificado. Nombres en español porque los lee Airside.
+        "metar": {
+            "temp":       m.get("temp"),
+            "rocio":      m.get("dewp"),
+            "vientoDir":  m.get("wdir"),
+            "vientoKt":   m.get("wspd"),
+            "rafagaKt":   m.get("wgst"),
+            "visib":      m.get("visib"),
+            "qnh":        m.get("altim"),
+            "categoria":  m.get("fltCat"),
+            "nubes":      [{"cobertura": c.get("cover"), "baseFt": c.get("base")}
+                           for c in (m.get("clouds") or [])],
+            "estacion":   m.get("name"),
+            "elevM":      m.get("elev"),
+        },
     }]
 
 
