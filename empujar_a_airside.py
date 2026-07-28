@@ -62,8 +62,17 @@ def leer(dias: int, solo_puj: bool) -> list[dict]:
         sql += " and affects_puj = 1"
     sql += " order by published desc limit 300"
 
+    # Las dos pertenencias que ordenan la portada de AeroIntel y que Airside
+    # necesita para sus filtros. Se calculan con las MISMAS reglas de AeroIntel
+    # —su regex y su columna—, no con una copia que se quedaría vieja.
+    from relevancia import PUJ_DIRECT_RE
+
     salida = []
     for r in con.execute(sql, args):
+        # La mención se busca en el TITULAR, como hace AeroIntel. Buscarla en el
+        # "porqué" contamina: ese texto es análisis de AeroIntel y nombra a PUJ
+        # casi siempre — salían 295 de 300 y el filtro no cortaba nada.
+        texto = r["title"] or ""
         salida.append({
             "id": r["link"],
             "titulo": r["title"],
@@ -78,8 +87,93 @@ def leer(dias: int, solo_puj: bool) -> list[dict]:
             # Las entidades vienen como JSON de texto. Se aplanan aquí y no en
             # Airside: quien conoce el formato es quien lo escribió.
             "entidades": _entidades(r["entities"]),
+            "puj": bool(PUJ_DIRECT_RE.search(texto)),   # mención directa del aeropuerto
+            "rd": r["dr_tier"] == "core",               # noticia del país
         })
     return salida
+
+
+def leer_notams() -> list[dict]:
+    """NOTAMs de MDPC vía notams.py (FAA con respaldo SkyLink), traducidos al
+    formato de Airside. La clasificación —sujeto, importancia, CIERRE— es la
+    de AeroIntel: aquí solo se traduce, no se opina."""
+    from notams import fetch_notams
+    crudos, err = fetch_notams()
+    if err:
+        print(f"  NOTAM: sin datos ({err})", file=sys.stderr)
+        return []
+    fuera = []
+    for n in crudos:
+        if n.get("status") == "expirado":
+            continue                      # un NOTAM vencido no es información, es ruido
+        vig = "vigente" if n["status"] == "vigente" else "programado"
+        etiquetas = [n["id"], n.get("subject") or "", vig.upper()]
+        if n.get("cierre"):
+            etiquetas.append("CIERRE")
+        fuera.append({
+            "id":        f'{n.get("location","MDPC")} {n["id"]}',
+            "titulo":    n.get("body") or n.get("raw") or n["id"],
+            "enlace":    n.get("source_url"),
+            "fuente":    n.get("source"),
+            "categoria": n.get("subject"),
+            # Traducción de la clasificación de AeroIntel, no una opinión nueva:
+            # CIERRE explícito → crítico; importancia alta → importante.
+            "gravedad":  "critico" if n.get("cierre")
+                         else ("importante" if n.get("importance") == "alta" else "info"),
+            "porque":    n.get("lectura"),
+            "publicado": n.get("effective"),
+            "entidades": [e for e in etiquetas if e],
+        })
+    return fuera
+
+
+def leer_nas() -> list[dict]:
+    """Estado del espacio aéreo de EE.UU. (Ground Stops, demoras, cierres) vía
+    nas.py. `puj_route` lo calcula AeroIntel: aeropuertos con ruta a PUJ."""
+    from nas import fetch_nas
+    datos, err = fetch_nas()
+    if err or not datos:
+        print(f"  NAS: sin datos ({err})", file=sys.stderr)
+        return []
+    fuera = []
+    for e in datos.get("events", []):
+        etiquetas = [e.get("airport") or "", e.get("kind") or ""]
+        if e.get("puj_route"):
+            etiquetas.append("RUTA PUJ")
+        fuera.append({
+            "id":        f'{e.get("kind")}-{e.get("airport")}',
+            "titulo":    f'{e.get("label")}: {e.get("airport")}',
+            "enlace":    e.get("source_url"),
+            "fuente":    e.get("source"),
+            "categoria": "operaciones",
+            "gravedad":  "importante" if e.get("puj_route") else "info",
+            "porque":    " · ".join(x for x in (e.get("reason_es"), e.get("detail")) if x),
+            "publicado": datos.get("updated") or datos.get("fetched_at"),
+            "entidades": [x for x in etiquetas if x],
+        })
+    return fuera
+
+
+def leer_clima() -> list[dict]:
+    """El METAR de MDPC vía clima.py. Un solo item: la observación vigente."""
+    from clima import fetch_weather
+    d = fetch_weather()
+    if not d:
+        print("  Clima: sin METAR", file=sys.stderr)
+        return []
+    m = d.get("metar") or {}
+    crudo = m.get("rawOb") or m.get("raw_text") or ""
+    return [{
+        "id":        f'METAR {d.get("station")}',
+        "titulo":    f'METAR {d.get("station")} · observación vigente',
+        "enlace":    f'https://aviationweather.gov/data/metar/?id={d.get("station")}',
+        "fuente":    "aviationweather.gov",
+        "categoria": "meteo",
+        "gravedad":  "info",
+        "porque":    crudo,               # el METAR crudo: quien lo lee, lo entiende
+        "publicado": m.get("reportTime") or d.get("fetched_at"),
+        "entidades": [d.get("station") or ""],
+    }]
 
 
 def empujar(url: str, clave: str, tipo: str, items: list[dict]) -> None:
@@ -108,22 +202,33 @@ def main() -> int:
               "—y hace bien.", file=sys.stderr)
         return 2
 
-    items = leer(a.dias, solo_puj=not a.todo)
-    print(f"AeroIntel → Airside: {len(items)} artículos de los últimos {a.dias} días")
-    if not items:
-        print("  nada que mandar")
-        return 0
+    # Cada tipo por separado y con fallo suave: que la FAA no responda no puede
+    # dejar sin noticias a Airside, ni al revés. Se manda lo que se tenga.
+    lotes: list[tuple[str, list[dict]]] = [
+        ("noticias", leer(a.dias, solo_puj=not a.todo)),
+    ]
+    for tipo, lector in (("notam", leer_notams), ("nas", leer_nas), ("clima", leer_clima)):
+        try:
+            lotes.append((tipo, lector()))
+        except Exception as e:
+            print(f"  {tipo}: no se pudo leer ({type(e).__name__}: {e})", file=sys.stderr)
 
-    try:
-        empujar(a.url, clave, "noticias", items)
-    except urllib.error.HTTPError as e:
-        # No se rompe el ciclo de AeroIntel porque Airside diga que no.
-        print(f"  Airside rechazó ({e.code}): {e.read().decode()[:200]}", file=sys.stderr)
-        return 1
-    except Exception as e:
-        print(f"  Airside no responde: {e}", file=sys.stderr)
-        return 1
-    return 0
+    fallo = 0
+    for tipo, items in lotes:
+        print(f"AeroIntel → Airside · {tipo}: {len(items)} items")
+        if not items:
+            print("  nada que mandar")
+            continue
+        try:
+            empujar(a.url, clave, tipo, items)
+        except urllib.error.HTTPError as e:
+            # No se rompe el ciclo de AeroIntel porque Airside diga que no.
+            print(f"  Airside rechazó ({e.code}): {e.read().decode()[:200]}", file=sys.stderr)
+            fallo = 1
+        except Exception as e:
+            print(f"  Airside no responde: {e}", file=sys.stderr)
+            fallo = 1
+    return fallo
 
 
 if __name__ == "__main__":
