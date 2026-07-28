@@ -185,6 +185,47 @@ def leer_nas() -> list[dict]:
     return fuera
 
 
+# Pronóstico: Open-Meteo. Sin clave, sin cuota y con modelo propio. Lo pide
+# AeroIntel y no el navegador de Airside — la regla del proyecto es que el
+# navegador no sale a internet, y por eso existe hasta el proxy de /api/csv.
+OPEN_METEO = ("https://api.open-meteo.com/v1/forecast"
+              "?latitude=18.567&longitude=-68.363"
+              "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"
+              "&hourly=temperature_2m,precipitation_probability"
+              "&forecast_days=7&timezone=America/Santo_Domingo")
+
+
+def _pronostico() -> "dict | None":
+    """Siete días y las próximas horas. Si falla, se devuelve None y el módulo
+    enseña sólo la observación: media meteorología es mejor que ninguna."""
+    try:
+        with urllib.request.urlopen(OPEN_METEO, timeout=20) as r:
+            d = json.loads(r.read())
+    except Exception as e:
+        print(f"  Clima: sin pronóstico ({type(e).__name__}: {e})", file=sys.stderr)
+        return None
+
+    dia = d.get("daily") or {}
+    hor = d.get("hourly") or {}
+    dias = [{"fecha": f, "codigo": c, "max": mx, "min": mn, "lluviaPct": pp}
+            for f, c, mx, mn, pp in zip(dia.get("time", []), dia.get("weather_code", []),
+                                        dia.get("temperature_2m_max", []),
+                                        dia.get("temperature_2m_min", []),
+                                        dia.get("precipitation_probability_max", []))]
+    # Sólo las próximas 24 h de la curva: 168 puntos en una franja de 900 px no
+    # se leen, y el resto ya lo resume la tira de días.
+    ahora = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%dT%H:00")
+    horas = list(zip(hor.get("time", []), hor.get("temperature_2m", []),
+                     hor.get("precipitation_probability", [])))
+    desde = next((i for i, h in enumerate(horas) if h[0] >= ahora), 0)
+    return {
+        "dias": dias[:7],
+        "horas": [{"hora": h, "temp": tp, "lluviaPct": pp}
+                  for h, tp, pp in horas[desde:desde + 24]],
+        "fuente": "Open-Meteo",
+    }
+
+
 def leer_clima() -> list[dict]:
     """El METAR de MDPC vía clima.py, ENTERO.
 
@@ -227,6 +268,7 @@ def leer_clima() -> list[dict]:
             "estacion":   m.get("name"),
             "elevM":      m.get("elev"),
         },
+        "pronostico": _pronostico(),
     }]
 
 
