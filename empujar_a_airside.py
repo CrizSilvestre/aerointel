@@ -93,25 +93,51 @@ def leer(dias: int, solo_puj: bool) -> list[dict]:
     return salida
 
 
+# El sitio publicado de AeroIntel. Su pipeline corre en GitHub Actions —donde
+# SÍ viven las claves, como secretos— y expone el resultado ya normalizado en
+# /api/notams.json. Cuando la recogida local falla (la FAA bloquea IPs
+# residenciales a ratos, y la clave de SkyLink no se guarda en esta máquina),
+# ahí está el mismo dato, recogido por quien sí pudo.
+AEROINTEL_PUBLICADO = os.environ.get(
+    "AEROINTEL_API_URL", "https://crizsilvestre.github.io/aerointel")
+
+
+def _notams_publicados() -> list[dict]:
+    url = AEROINTEL_PUBLICADO.rstrip("/") + "/api/notams.json"
+    with urllib.request.urlopen(url, timeout=20) as r:
+        d = json.loads(r.read())
+    lista = d.get("notams") or []
+    cuando = d.get("generated_at", "¿?")
+    print(f"  NOTAM: {len(lista)} del sitio publicado (generado {cuando})")
+    return lista
+
+
 def leer_notams() -> list[dict]:
-    """NOTAMs de MDPC vía notams.py (FAA con respaldo SkyLink), traducidos al
-    formato de Airside. La clasificación —sujeto, importancia, CIERRE— es la
-    de AeroIntel: aquí solo se traduce, no se opina."""
+    """NOTAMs de MDPC, traducidos al formato de Airside. Primero la recogida
+    local (FAA, respaldo SkyLink); si no hay, el sitio publicado de AeroIntel,
+    que es el MISMO dato recogido por el pipeline con sus claves. La
+    clasificación —sujeto, importancia, CIERRE— es la de AeroIntel: aquí solo
+    se traduce, no se opina."""
     from notams import fetch_notams
     crudos, err = fetch_notams()
-    if err:
-        print(f"  NOTAM: sin datos ({err})", file=sys.stderr)
-        return []
+    if err or not crudos:
+        if err:
+            print(f"  NOTAM: recogida local sin datos ({err}) — probando el sitio publicado", file=sys.stderr)
+        try:
+            crudos = _notams_publicados()
+        except Exception as e:
+            print(f"  NOTAM: el sitio publicado tampoco ({type(e).__name__}: {e})", file=sys.stderr)
+            return []
     fuera = []
     for n in crudos:
         if n.get("status") == "expirado":
             continue                      # un NOTAM vencido no es información, es ruido
-        vig = "vigente" if n["status"] == "vigente" else "programado"
-        etiquetas = [n["id"], n.get("subject") or "", vig.upper()]
+        etiquetas = [n.get("location") or "", n.get("tipo") or ""]
         if n.get("cierre"):
             etiquetas.append("CIERRE")
         fuera.append({
             "id":        f'{n.get("location","MDPC")} {n["id"]}',
+            "codigo":    n["id"],                       # A429/2026 — la ficha lo lleva en grande
             "titulo":    n.get("body") or n.get("raw") or n["id"],
             "enlace":    n.get("source_url"),
             "fuente":    n.get("source"),
@@ -122,6 +148,10 @@ def leer_notams() -> list[dict]:
                          else ("importante" if n.get("importance") == "alta" else "info"),
             "porque":    n.get("lectura"),
             "publicado": n.get("effective"),
+            "estado":    n.get("status"),               # vigente | programado
+            "desde":     n.get("effective"),
+            "hasta":     None if n.get("permanent") else n.get("expiration"),
+            "crudo":     n.get("raw") or None,          # el texto tal cual lo publicó la autoridad
             "entidades": [e for e in etiquetas if e],
         })
     return fuera
@@ -137,19 +167,20 @@ def leer_nas() -> list[dict]:
         return []
     fuera = []
     for e in datos.get("events", []):
-        etiquetas = [e.get("airport") or "", e.get("kind") or ""]
-        if e.get("puj_route"):
-            etiquetas.append("RUTA PUJ")
+        etiquetas = ["RUTA PUJ"] if e.get("puj_route") else []
         fuera.append({
             "id":        f'{e.get("kind")}-{e.get("airport")}',
-            "titulo":    f'{e.get("label")}: {e.get("airport")}',
+            "codigo":    e.get("airport"),              # BOS — la ficha lo lleva en grande
+            "titulo":    e.get("label") or e.get("kind"),
             "enlace":    e.get("source_url"),
             "fuente":    e.get("source"),
-            "categoria": "operaciones",
+            # La etiqueta en español ES la categoría: así los filtros salen
+            # como en AeroIntel — «Programa de demoras · 5», «Demoras · 7».
+            "categoria": e.get("label") or "operaciones",
             "gravedad":  "importante" if e.get("puj_route") else "info",
             "porque":    " · ".join(x for x in (e.get("reason_es"), e.get("detail")) if x),
             "publicado": datos.get("updated") or datos.get("fetched_at"),
-            "entidades": [x for x in etiquetas if x],
+            "entidades": etiquetas,
         })
     return fuera
 
