@@ -132,7 +132,15 @@ def leer_notams() -> list[dict]:
     for n in crudos:
         if n.get("status") == "expirado":
             continue                      # un NOTAM vencido no es información, es ruido
+        # El alcance importa y hasta ahora se perdía: un NOTAM de MDCS no es de
+        # otro aeropuerto, es del FIR de Santo Domingo —espacio aéreo dominicano
+        # entero— y afecta a PUJ, pero NO es un aviso del aeródromo. Mezclarlos
+        # bajo el rótulo «NOTAM · MDPC» hace que la lista no cuadre con la de la
+        # FAA y que nadie sepa cuáles son de la casa.
+        es_fir = (n.get("scope") or "").lower().startswith("fir")
         etiquetas = [n.get("location") or "", n.get("tipo") or ""]
+        if es_fir:
+            etiquetas.append("FIR")
         if n.get("cierre"):
             etiquetas.append("CIERRE")
         fuera.append({
@@ -152,6 +160,8 @@ def leer_notams() -> list[dict]:
             "desde":     n.get("effective"),
             "hasta":     None if n.get("permanent") else n.get("expiration"),
             "crudo":     n.get("raw") or None,          # el texto tal cual lo publicó la autoridad
+            "ambito":    "fir" if es_fir else "aerodromo",
+            "estacion":  n.get("location") or None,
             "entidades": [e for e in etiquetas if e],
         })
     return fuera
