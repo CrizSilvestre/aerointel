@@ -16,6 +16,7 @@ Uso:
 import argparse
 import json
 import os
+import re
 import sqlite3
 import sys
 import urllib.error
@@ -29,6 +30,29 @@ BD = AQUI / "aerointel.db"
 # AeroIntel clasifica en español con tilde; Airside espera estas tres.
 GRAVEDAD = {"crítico": "critico", "critico": "critico",
             "importante": "importante", "info": "info"}
+
+
+def _utc(s):
+    """Marca como UTC una fecha que YA es UTC pero no lo dice.
+
+    `ingesta.parse_date` normaliza a UTC y acto seguido hace
+    `.replace(tzinfo=None)`, así que en la base quedan cadenas como
+    «2026-08-05T17:16:24»: el valor es correcto, pero no lleva zona.
+
+    Aquí eso daba igual —AeroIntel compara siempre contra `utcnow()`—, pero al
+    salir por el cable deja de dar igual: una cadena de fecha-hora sin
+    desplazamiento la lee JavaScript como hora LOCAL. En Punta Cana son cuatro
+    horas de adelanto, así que en Airside las noticias salían fechadas en el
+    futuro, la edad daba negativa y TODAS decían «hace 1 min».
+
+    Quien conoce el formato es quien lo escribe: se marca aquí.
+    """
+    if not s:
+        return s
+    t = str(s).strip()
+    if t.endswith("Z") or re.search(r"[+-]\d{2}:?\d{2}$", t):
+        return t                      # ya trae zona: se respeta la que venga
+    return t.replace(" ", "T") + "Z"
 
 
 def _entidades(bruto) -> list[str]:
@@ -82,7 +106,7 @@ def leer(dias: int, solo_puj: bool) -> list[dict]:
             "gravedad": GRAVEDAD.get((r["severity"] or "").lower(), "info"),
             "impacto": r["impact"],
             "porque": r["why"],          # lo que convierte un titular en información
-            "publicado": r["published"],
+            "publicado": _utc(r["published"]),
             "imagen": r["image"],
             # Las entidades vienen como JSON de texto. Se aplanan aquí y no en
             # Airside: quien conoce el formato es quien lo escribió.
